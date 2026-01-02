@@ -297,7 +297,7 @@ class Database:
                             status: str, error_message: str = '') -> None:
         """记录抓取状态"""
         self.execute("""
-            INSERT INTO crawl_source_status (crawl_record_id, platform_id, status, error_message)
+            INSERT OR REPLACE INTO crawl_source_status (crawl_record_id, platform_id, status, error_message)
             VALUES (?, ?, ?, ?)
         """, (crawl_record_id, platform_id, status, error_message))
     

@@ -157,8 +157,7 @@ async def run_crawler_task(crawl_type: str):
         _crawl_status["running"] = True
         _crawl_status["message"] = f"正在抓取 {crawl_type} 数据..."
         
-        # 导入爬虫模块并运行
-        from trendradar.crawler.fetcher import fetch_all_platforms
+        from trendradar.crawler.fetcher import DataFetcher
         from trendradar.web.app import get_db, get_config_manager
         
         db = get_db()
@@ -167,95 +166,139 @@ async def run_crawler_task(crawl_type: str):
         if crawl_type in ['hotlist', 'all']:
             platforms = config.get_platforms()
             
-            # 抓取热榜数据
-            results = await asyncio.to_thread(fetch_all_platforms, platforms)
+            # 构建平台 ID 列表
+            ids_list = [(p['id'], p['name']) for p in platforms]
+            
+            # 使用 DataFetcher 抓取数据
+            fetcher = DataFetcher()
+            results, id_to_name, failed_ids = await asyncio.to_thread(
+                fetcher.crawl_websites, ids_list, 500
+            )
             
             # 保存到数据库
             crawl_record_id = db.record_crawl(crawl_type='hotlist', total_items=0)
             total_items = 0
             
-            for platform_id, news_list in results.items():
-                if news_list:
+            for platform_id, titles_data in results.items():
+                platform_name = id_to_name.get(platform_id, platform_id)
+                
+                # 确保平台存在
+                db.upsert_platform(
+                    platform_id=platform_id,
+                    name=platform_name,
+                    platform_type='hotlist'
+                )
+                
+                # 保存新闻
+                for title, title_info in titles_data.items():
+                    ranks = title_info.get('ranks', [])
+                    rank = min(ranks) if ranks else 0
+                    
+                    db.upsert_news(
+                        title=title,
+                        platform_id=platform_id,
+                        url=title_info.get('url', ''),
+                        rank=rank,
+                        mobile_url=title_info.get('mobileUrl', '')
+                    )
+                    total_items += 1
+                
+                db.record_crawl_status(crawl_record_id, platform_id, 'success')
+                db.update_platform_status(platform_id, 'success')
+            
+            # 记录失败的平台（排除已成功记录的）
+            recorded_platforms = set(results.keys())
+            for failed_id in failed_ids:
+                if failed_id not in recorded_platforms:
                     # 确保平台存在
-                    platform_config = next((p for p in platforms if p['id'] == platform_id), None)
-                    if platform_config:
-                        db.upsert_platform(
-                            platform_id=platform_id,
-                            name=platform_config.get('name', platform_id),
-                            platform_type='hotlist'
-                        )
-                    
-                    for rank, news in enumerate(news_list, 1):
-                        db.upsert_news(
-                            title=news.get('title', ''),
-                            platform_id=platform_id,
-                            url=news.get('url', ''),
-                            rank=rank,
-                            mobile_url=news.get('mobile_url', '')
-                        )
-                        total_items += 1
-                    
-                    db.record_crawl_status(crawl_record_id, platform_id, 'success')
-                    db.update_platform_status(platform_id, 'success')
-                else:
-                    db.record_crawl_status(crawl_record_id, platform_id, 'failed')
-                    db.update_platform_status(platform_id, 'failed')
+                    db.upsert_platform(
+                        platform_id=failed_id,
+                        name=id_to_name.get(failed_id, failed_id),
+                        platform_type='hotlist'
+                    )
+                    db.record_crawl_status(crawl_record_id, failed_id, 'failed')
+                    db.update_platform_status(failed_id, 'failed')
             
             # 更新抓取记录中的总数
             db.execute(
                 "UPDATE crawl_records SET total_items = ? WHERE id = ?",
                 (total_items, crawl_record_id)
             )
+            
+            _crawl_status["message"] = f"热榜抓取完成，共 {total_items} 条"
         
         if crawl_type in ['rss', 'all']:
             rss_config = config.get('rss', {})
             if rss_config.get('enabled'):
                 feeds = rss_config.get('feeds', [])
                 
-                from trendradar.crawler.rss.fetcher import fetch_rss_feed
+                from trendradar.crawler.rss.fetcher import RSSFetcher, RSSFeedConfig
                 
-                crawl_record_id = db.record_crawl(crawl_type='rss', total_items=0)
-                total_items = 0
-                
-                for feed in feeds:
-                    if not feed.get('enabled', True):
-                        continue
-                    
-                    feed_id = feed['id']
-                    feed_url = feed.get('url', '')
-                    
-                    # 确保 RSS 源存在
-                    db.upsert_platform(
-                        platform_id=feed_id,
-                        name=feed.get('name', feed_id),
-                        platform_type='rss',
-                        feed_url=feed_url
+                # 构建 RSS 源配置
+                feed_configs = [
+                    RSSFeedConfig(
+                        id=f['id'],
+                        name=f.get('name', f['id']),
+                        url=f.get('url', ''),
+                        enabled=f.get('enabled', True)
                     )
+                    for f in feeds if f.get('enabled', True) and f.get('url')
+                ]
+                
+                if feed_configs:
+                    crawl_record_id = db.record_crawl(crawl_type='rss', total_items=0)
+                    total_items = 0
                     
-                    try:
-                        items = await asyncio.to_thread(fetch_rss_feed, feed_url)
+                    # 使用 RSSFetcher 抓取
+                    fetcher = RSSFetcher(feeds=feed_configs)
+                    rss_result = await asyncio.to_thread(fetcher.fetch_all)
+                    
+                    # rss_result 是 RSSData 对象
+                    for feed_id, items_list in rss_result.items.items():
+                        # 确保 RSS 源存在
+                        feed_name = rss_result.id_to_name.get(feed_id, feed_id)
+                        feed_config = next((f for f in feed_configs if f.id == feed_id), None)
+                        feed_url = feed_config.url if feed_config else ''
                         
-                        for item in items:
+                        db.upsert_platform(
+                            platform_id=feed_id,
+                            name=feed_name,
+                            platform_type='rss',
+                            feed_url=feed_url
+                        )
+                        
+                        # 保存 RSS 条目（items_list 是 RSSItem 对象列表）
+                        for item in items_list:
                             db.upsert_news(
-                                title=item.get('title', ''),
+                                title=item.title,
                                 platform_id=feed_id,
-                                url=item.get('link', ''),
-                                summary=item.get('summary', ''),
-                                author=item.get('author', ''),
-                                published_at=item.get('published', '')
+                                url=item.url,
+                                summary=item.summary,
+                                author=item.author,
+                                published_at=item.published_at
                             )
                             total_items += 1
                         
                         db.record_crawl_status(crawl_record_id, feed_id, 'success')
                         db.update_platform_status(feed_id, 'success')
-                    except Exception as e:
-                        db.record_crawl_status(crawl_record_id, feed_id, 'failed', str(e))
-                        db.update_platform_status(feed_id, 'failed')
-                
-                db.execute(
-                    "UPDATE crawl_records SET total_items = ? WHERE id = ?",
-                    (total_items, crawl_record_id)
-                )
+                    
+                    # 记录失败的源
+                    for failed_id in rss_result.failed_ids:
+                        feed_name = rss_result.id_to_name.get(failed_id, failed_id)
+                        db.upsert_platform(
+                            platform_id=failed_id,
+                            name=feed_name,
+                            platform_type='rss'
+                        )
+                        db.record_crawl_status(crawl_record_id, failed_id, 'failed')
+                        db.update_platform_status(failed_id, 'failed')
+                    
+                    db.execute(
+                        "UPDATE crawl_records SET total_items = ? WHERE id = ?",
+                        (total_items, crawl_record_id)
+                    )
+                    
+                    _crawl_status["message"] = f"RSS 抓取完成，共 {total_items} 条"
         
         from datetime import datetime
         _crawl_status["last_run"] = datetime.now().isoformat()
