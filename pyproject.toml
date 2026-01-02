@@ -1,7 +1,7 @@
 [project]
 name = "trendradar"
-version = "4.5.0"
-description = "TrendRadar - 热点新闻聚合与分析工具"
+version = "5.0.0"
+description = "TrendRadar - 热点新闻聚合与分析工具 (Web版)"
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.32.5,<3.0.0",
@@ -11,11 +11,16 @@ dependencies = [
     "websockets>=13.0,<14.0",
     "feedparser>=6.0.0,<7.0.0",
     "boto3>=1.35.0,<2.0.0",
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn>=0.32.0,<1.0.0",
+    "jinja2>=3.1.0,<4.0.0",
+    "python-multipart>=0.0.9,<1.0.0",
 ]
 
 [project.scripts]
 trendradar = "trendradar.__main__:main"
 trendradar-mcp = "mcp_server.server:run_server"
+trendradar-web = "trendradar.web:main"
 
 [dependency-groups]
 dev = []

@@ -22,7 +22,6 @@ from trendradar.core.config import (
 from .senders import (
     send_to_bark,
     send_to_dingtalk,
-    send_to_email,
     send_to_feishu,
     send_to_ntfy,
     send_to_slack,
@@ -133,14 +132,6 @@ class NotificationDispatcher:
             results["slack"] = self._send_slack(
                 report_data, report_type, update_info, proxy_url, mode, rss_items, rss_new_items
             )
-
-        # 邮件（保持原有逻辑，已支持多收件人）
-        if (
-            self.config.get("EMAIL_FROM")
-            and self.config.get("EMAIL_PASSWORD")
-            and self.config.get("EMAIL_TO")
-        ):
-            results["email"] = self._send_email(report_type, html_file_path)
 
         return results
 
@@ -439,23 +430,6 @@ class NotificationDispatcher:
             ),
         )
 
-    def _send_email(
-        self,
-        report_type: str,
-        html_file_path: Optional[str],
-    ) -> bool:
-        """发送邮件（保持原有逻辑，已支持多收件人）"""
-        return send_to_email(
-            from_email=self.config["EMAIL_FROM"],
-            password=self.config["EMAIL_PASSWORD"],
-            to_email=self.config["EMAIL_TO"],
-            report_type=report_type,
-            html_file_path=html_file_path,
-            custom_smtp_server=self.config.get("EMAIL_SMTP_SERVER", ""),
-            custom_smtp_port=self.config.get("EMAIL_SMTP_PORT", ""),
-            get_time_func=self.get_time_func,
-        )
-
     # === RSS 通知方法 ===
 
     def dispatch_rss(
@@ -532,14 +506,6 @@ class NotificationDispatcher:
             results["slack"] = self._send_rss_markdown(
                 rss_items, feeds_info, proxy_url, "slack"
             )
-
-        # 邮件
-        if (
-            self.config.get("EMAIL_FROM")
-            and self.config.get("EMAIL_PASSWORD")
-            and self.config.get("EMAIL_TO")
-        ):
-            results["email"] = self._send_email(report_type, html_file_path)
 
         return results
 

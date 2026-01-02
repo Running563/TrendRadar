@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- 统计卡片 -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-2xl font-bold text-primary">{{ stats.today_news | default(0) }}</div>
+        <div class="text-sm text-gray-500">今日新闻</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-2xl font-bold text-green-600">{{ stats.total_news | default(0) }}</div>
+        <div class="text-sm text-gray-500">新闻总数</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-2xl font-bold text-purple-600">{{ stats.platform_stats | length }}</div>
+        <div class="text-sm text-gray-500">数据源</div>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4">
+        <div class="text-lg font-medium text-gray-700">
+            {% if stats.last_crawl %}
+                {{ stats.last_crawl[:16] | replace('T', ' ') }}
+            {% else %}
+                暂无
+            {% endif %}
+        </div>
+        <div class="text-sm text-gray-500">最近抓取</div>
+    </div>
+</div>
+
+<!-- 热榜内容 -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for platform_id, data in platform_news.items() %}
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-4 py-3 border-b flex justify-between items-center">
+            <h3 class="font-medium text-gray-800">{{ data.name }}</h3>
+            <a href="/news?platform={{ platform_id }}" class="text-xs text-primary hover:underline">更多</a>
+        </div>
+        <ul class="divide-y">
+            {% for news in data.news[:10] %}
+            <li class="px-4 py-2 hover:bg-gray-50">
+                <a href="{{ news.url }}" target="_blank" class="flex items-start space-x-2 group">
+                    <span class="flex-shrink-0 w-5 h-5 rounded text-xs flex items-center justify-center
+                        {% if loop.index <= 3 %}bg-red-500 text-white{% else %}bg-gray-200 text-gray-600{% endif %}">
+                        {{ loop.index }}
+                    </span>
+                    <span class="text-sm text-gray-700 group-hover:text-primary line-clamp-2">
+                        {{ news.title }}
+                    </span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% else %}
+    <div class="col-span-full text-center py-12 text-gray-500">
+        <p class="mb-4">暂无数据</p>
+        <button onclick="triggerCrawl()" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+            立即抓取
+        </button>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

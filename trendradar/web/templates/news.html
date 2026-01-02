@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- 筛选栏 -->
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <form method="get" class="flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-sm text-gray-600 mb-1">搜索</label>
+            <input type="text" name="search" value="{{ current_search or '' }}" 
+                placeholder="搜索新闻标题..." 
+                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+        </div>
+        <div class="w-40">
+            <label class="block text-sm text-gray-600 mb-1">平台</label>
+            <select name="platform" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary">
+                <option value="">全部平台</option>
+                {% for p in platforms %}
+                <option value="{{ p.id }}" {% if current_platform == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="w-40">
+            <label class="block text-sm text-gray-600 mb-1">日期</label>
+            <select name="date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary">
+                <option value="">全部日期</option>
+                {% for d in available_dates %}
+                <option value="{{ d }}" {% if current_date == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+            筛选
+        </button>
+        {% if current_search or current_platform or current_date %}
+        <a href="/news" class="px-4 py-2 text-gray-600 hover:text-primary">清除</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- 结果统计 -->
+<div class="flex justify-between items-center mb-4">
+    <p class="text-sm text-gray-600">
+        共 <span class="font-medium">{{ total }}</span> 条新闻
+        {% if total_pages > 1 %}，第 {{ page }}/{{ total_pages }} 页{% endif %}
+    </p>
+</div>
+
+<!-- 新闻列表 -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full">
+        <thead class="bg-gray-50 text-left">
+            <tr>
+                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-12">排名</th>
+                <th class="px-4 py-3 text-sm font-medium text-gray-600">标题</th>
+                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-24 hidden md:table-cell">平台</th>
+                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-36 hidden lg:table-cell">时间</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y">
+            {% for news in news_list %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded text-xs
+                        {% if news.rank <= 3 %}bg-red-500 text-white{% elif news.rank <= 10 %}bg-orange-400 text-white{% else %}bg-gray-200 text-gray-600{% endif %}">
+                        {{ news.rank or '-' }}
+                    </span>
+                </td>
+                <td class="px-4 py-3">
+                    <a href="{{ news.url }}" target="_blank" class="text-gray-800 hover:text-primary">
+                        {{ news.title }}
+                    </a>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">
+                    {{ news.platform_name }}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">
+                    {{ news.first_crawl_time[:16] | replace('T', ' ') if news.first_crawl_time else '-' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" class="px-4 py-12 text-center text-gray-500">
+                    暂无数据
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 分页 -->
+{% if total_pages > 1 %}
+<div class="flex justify-center mt-6 space-x-2">
+    {% if page > 1 %}
+    <a href="?page={{ page - 1 }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
+       class="px-3 py-1 border rounded hover:bg-gray-50">上一页</a>
+    {% endif %}
+    
+    {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="px-3 py-1 bg-primary text-white rounded">{{ p }}</span>
+        {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+        <a href="?page={{ p }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
+           class="px-3 py-1 border rounded hover:bg-gray-50">{{ p }}</a>
+        {% elif p == page - 3 or p == page + 3 %}
+        <span class="px-2">...</span>
+        {% endif %}
+    {% endfor %}
+    
+    {% if page < total_pages %}
+    <a href="?page={{ page + 1 }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
+       class="px-3 py-1 border rounded hover:bg-gray-50">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

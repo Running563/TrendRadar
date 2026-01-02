@@ -1,0 +1,6 @@
+output
+venv
+__pycache__
+logs
+run_trendradar.sh
+*.db

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <!-- 返回链接 -->
+    <a href="javascript:history.back()" class="inline-flex items-center text-gray-500 hover:text-primary mb-4">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        返回
+    </a>
+
+    <!-- 新闻详情 -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h1 class="text-xl font-bold text-gray-800 mb-4">{{ news.title }}</h1>
+        
+        <div class="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
+            <span class="bg-blue-50 text-blue-600 px-2 py-1 rounded">{{ news.platform_name }}</span>
+            {% if news.rank %}
+            <span>排名: #{{ news.rank }}</span>
+            {% endif %}
+            {% if news.author %}
+            <span>作者: {{ news.author }}</span>
+            {% endif %}
+            <span>首次发现: {{ news.first_crawl_time[:16] | replace('T', ' ') }}</span>
+            <span>最后更新: {{ news.last_crawl_time[:16] | replace('T', ' ') }}</span>
+            <span>抓取次数: {{ news.crawl_count }}</span>
+        </div>
+
+        {% if news.summary %}
+        <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <h3 class="text-sm font-medium text-gray-600 mb-2">摘要</h3>
+            <p class="text-gray-700">{{ news.summary }}</p>
+        </div>
+        {% endif %}
+
+        <a href="{{ news.url }}" target="_blank" 
+           class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+            查看原文
+            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
+        </a>
+    </div>
+
+    <!-- 排名历史 -->
+    {% if rank_history %}
+    <div class="bg-white rounded-lg shadow mt-6">
+        <div class="border-b px-4 py-3">
+            <h2 class="font-medium text-gray-800">排名历史</h2>
+        </div>
+        <div class="p-4">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500">
+                            <th class="pb-2">时间</th>
+                            <th class="pb-2">排名</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y">
+                        {% for h in rank_history[:20] %}
+                        <tr>
+                            <td class="py-2">{{ h.crawl_time[:16] | replace('T', ' ') }}</td>
+                            <td class="py-2">
+                                <span class="inline-flex items-center justify-center w-6 h-6 rounded text-xs
+                                    {% if h.rank <= 3 %}bg-red-500 text-white{% elif h.rank <= 10 %}bg-orange-400 text-white{% else %}bg-gray-200 text-gray-600{% endif %}">
+                                    {{ h.rank }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 标题变更历史 -->
+    {% if title_changes %}
+    <div class="bg-white rounded-lg shadow mt-6">
+        <div class="border-b px-4 py-3">
+            <h2 class="font-medium text-gray-800">标题变更历史</h2>
+        </div>
+        <div class="p-4">
+            <ul class="space-y-3">
+                {% for c in title_changes %}
+                <li class="text-sm">
+                    <div class="text-gray-400 text-xs mb-1">{{ c.changed_at[:16] | replace('T', ' ') }}</div>
+                    <div class="flex items-start">
+                        <span class="text-red-500 line-through">{{ c.old_title }}</span>
+                        <svg class="w-4 h-4 mx-2 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                        <span class="text-green-600">{{ c.new_title }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

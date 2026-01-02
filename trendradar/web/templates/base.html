@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title | default('TrendRadar') }} - TrendRadar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <span class="text-xl font-bold text-primary">TrendRadar</span>
+                    </a>
+                    <div class="hidden sm:ml-8 sm:flex sm:space-x-4">
+                        <a href="/" class="px-3 py-2 text-sm font-medium {% if request.url.path == '/' %}text-primary border-b-2 border-primary{% else %}text-gray-600 hover:text-primary{% endif %}">
+                            热点概览
+                        </a>
+                        <a href="/news" class="px-3 py-2 text-sm font-medium {% if '/news' in request.url.path %}text-primary border-b-2 border-primary{% else %}text-gray-600 hover:text-primary{% endif %}">
+                            新闻列表
+                        </a>
+                        <a href="/rss" class="px-3 py-2 text-sm font-medium {% if '/rss' in request.url.path %}text-primary border-b-2 border-primary{% else %}text-gray-600 hover:text-primary{% endif %}">
+                            RSS 订阅
+                        </a>
+                        <a href="/settings" class="px-3 py-2 text-sm font-medium {% if '/settings' in request.url.path %}text-primary border-b-2 border-primary{% else %}text-gray-600 hover:text-primary{% endif %}">
+                            系统设置
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="triggerCrawl()" id="crawl-btn" class="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-blue-600 transition">
+                        抓取数据
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 移动端导航 -->
+        <div class="sm:hidden border-t">
+            <div class="flex justify-around py-2">
+                <a href="/" class="text-sm {% if request.url.path == '/' %}text-primary{% else %}text-gray-600{% endif %}">概览</a>
+                <a href="/news" class="text-sm {% if '/news' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">新闻</a>
+                <a href="/rss" class="text-sm {% if '/rss' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">RSS</a>
+                <a href="/settings" class="text-sm {% if '/settings' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">设置</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t mt-8">
+        <div class="max-w-7xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
+            TrendRadar v5.0.0 - 热点新闻聚合与分析工具
+        </div>
+    </footer>
+
+    <!-- 全局提示 -->
+    <div id="toast" class="fixed bottom-4 right-4 hidden">
+        <div class="bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm"></div>
+    </div>
+
+    <script>
+        // 显示提示
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.querySelector('div').textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), duration);
+        }
+
+        // 触发爬虫
+        async function triggerCrawl() {
+            const btn = document.getElementById('crawl-btn');
+            btn.disabled = true;
+            btn.textContent = '抓取中...';
+            btn.classList.add('loading');
+
+            try {
+                const resp = await fetch('/api/crawl/trigger?type=all', { method: 'POST' });
+                const data = await resp.json();
+                showToast(data.message);
+                
+                // 轮询状态
+                pollCrawlStatus();
+            } catch (e) {
+                showToast('请求失败: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = '抓取数据';
+                btn.classList.remove('loading');
+            }
+        }
+
+        // 轮询爬虫状态
+        async function pollCrawlStatus() {
+            const btn = document.getElementById('crawl-btn');
+            
+            const check = async () => {
+                try {
+                    const resp = await fetch('/api/crawl/status');
+                    const data = await resp.json();
+                    
+                    if (data.running) {
+                        btn.textContent = data.message || '抓取中...';
+                        setTimeout(check, 2000);
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = '抓取数据';
+                        btn.classList.remove('loading');
+                        if (data.message) {
+                            showToast(data.message);
+                        }
+                        // 刷新页面显示新数据
+                        setTimeout(() => location.reload(), 1000);
+                    }
+                } catch (e) {
+                    btn.disabled = false;
+                    btn.textContent = '抓取数据';
+                    btn.classList.remove('loading');
+                }
+            };
+            
+            check();
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

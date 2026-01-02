@@ -28,8 +28,6 @@ from trendradar.core import (
 from trendradar.report import (
     clean_title,
     prepare_report_data,
-    generate_html_report,
-    render_html_content,
 )
 from trendradar.notification import (
     render_feishu_content,

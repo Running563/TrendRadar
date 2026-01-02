@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">系统设置</h1>
+    
+    <!-- 提示信息 -->
+    {% if request.query_params.get('saved') %}
+    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
+        配置已保存成功！
+    </div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+        保存失败: {{ request.query_params.get('error') }}
+    </div>
+    {% endif %}
+
+    <!-- 配置编辑 -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="border-b px-4 py-3">
+            <h2 class="font-medium text-gray-800">配置文件编辑</h2>
+            <p class="text-sm text-gray-500 mt-1">直接编辑 YAML 配置文件，保存后立即生效（无需重启）</p>
+        </div>
+        
+        <form action="/config/save" method="post">
+            <div class="p-4">
+                <textarea name="config_content" rows="30" 
+                    class="w-full font-mono text-sm p-4 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-gray-50"
+                    spellcheck="false">{{ config_raw }}</textarea>
+            </div>
+            
+            <div class="px-4 py-3 bg-gray-50 border-t flex justify-between items-center">
+                <div class="text-sm text-gray-500">
+                    提示: 修改后点击保存，配置会立即生效
+                </div>
+                <div class="space-x-3">
+                    <button type="button" onclick="resetConfig()" class="px-4 py-2 text-gray-600 hover:text-primary">
+                        重置
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
+                        保存配置
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 快捷配置 -->
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 平台管理 -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-4 py-3">
+                <h2 class="font-medium text-gray-800">热榜平台</h2>
+            </div>
+            <div class="p-4">
+                <ul class="space-y-2" id="platforms-list">
+                    {% for p in config.platforms %}
+                    <li class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded">
+                        <span class="text-sm">{{ p.name }} <span class="text-gray-400">({{ p.id }})</span></span>
+                        <button type="button" onclick="deletePlatform('{{ p.id }}')" class="text-red-500 hover:text-red-700 text-sm">
+                            删除
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="mt-4 flex gap-2">
+                    <input type="text" id="new-platform-id" placeholder="平台ID" class="flex-1 px-3 py-2 border rounded text-sm">
+                    <input type="text" id="new-platform-name" placeholder="平台名称" class="flex-1 px-3 py-2 border rounded text-sm">
+                    <button type="button" onclick="addPlatform()" class="px-3 py-2 bg-primary text-white rounded text-sm">添加</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RSS 管理 -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="border-b px-4 py-3 flex justify-between items-center">
+                <h2 class="font-medium text-gray-800">RSS 订阅源</h2>
+                <label class="flex items-center text-sm">
+                    <input type="checkbox" id="rss-enabled" {% if config.rss.enabled %}checked{% endif %} onchange="toggleRss()" class="mr-2">
+                    启用 RSS
+                </label>
+            </div>
+            <div class="p-4">
+                <ul class="space-y-2" id="rss-feeds-list">
+                    {% for f in config.rss.feeds %}
+                    <li class="py-2 px-3 bg-gray-50 rounded">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium">{{ f.name }}</span>
+                            <button type="button" onclick="deleteRssFeed('{{ f.id }}')" class="text-red-500 hover:text-red-700 text-sm">
+                                删除
+                            </button>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-1 truncate">{{ f.url }}</div>
+                    </li>
+                    {% else %}
+                    <li class="text-center text-gray-400 py-4 text-sm">暂无 RSS 订阅源</li>
+                    {% endfor %}
+                </ul>
+                <div class="mt-4 space-y-2">
+                    <div class="flex gap-2">
+                        <input type="text" id="new-rss-id" placeholder="源ID" class="w-24 px-3 py-2 border rounded text-sm">
+                        <input type="text" id="new-rss-name" placeholder="名称" class="flex-1 px-3 py-2 border rounded text-sm">
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-rss-url" placeholder="RSS URL" class="flex-1 px-3 py-2 border rounded text-sm">
+                        <button type="button" onclick="addRssFeed()" class="px-3 py-2 bg-primary text-white rounded text-sm">添加</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知配置 -->
+    <div class="mt-6 bg-white rounded-lg shadow">
+        <div class="border-b px-4 py-3 flex justify-between items-center">
+            <h2 class="font-medium text-gray-800">通知推送</h2>
+            <label class="flex items-center text-sm">
+                <input type="checkbox" id="notification-enabled" {% if config.notification.enabled %}checked{% endif %} onchange="toggleNotification()" class="mr-2">
+                启用通知
+            </label>
+        </div>
+        <div class="p-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for channel, channel_config in config.notification.channels.items() %}
+                <div class="border rounded-lg p-3">
+                    <h3 class="font-medium text-sm text-gray-700 mb-2">{{ channel | capitalize }}</h3>
+                    {% if 'webhook_url' in channel_config %}
+                    <input type="text" id="channel-{{ channel }}-webhook" 
+                        value="{{ channel_config.webhook_url }}" 
+                        placeholder="Webhook URL"
+                        class="w-full px-3 py-2 border rounded text-sm"
+                        onchange="updateChannel('{{ channel }}', 'webhook_url', this.value)">
+                    {% elif 'bot_token' in channel_config %}
+                    <input type="text" id="channel-{{ channel }}-token" 
+                        value="{{ channel_config.bot_token }}" 
+                        placeholder="Bot Token"
+                        class="w-full px-3 py-2 border rounded text-sm mb-2"
+                        onchange="updateChannel('{{ channel }}', 'bot_token', this.value)">
+                    <input type="text" id="channel-{{ channel }}-chat" 
+                        value="{{ channel_config.chat_id }}" 
+                        placeholder="Chat ID"
+                        class="w-full px-3 py-2 border rounded text-sm"
+                        onchange="updateChannel('{{ channel }}', 'chat_id', this.value)">
+                    {% elif 'url' in channel_config %}
+                    <input type="text" id="channel-{{ channel }}-url" 
+                        value="{{ channel_config.url }}" 
+                        placeholder="URL"
+                        class="w-full px-3 py-2 border rounded text-sm"
+                        onchange="updateChannel('{{ channel }}', 'url', this.value)">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 重置配置
+    function resetConfig() {
+        location.reload();
+    }
+
+    // 添加平台
+    async function addPlatform() {
+        const id = document.getElementById('new-platform-id').value.trim();
+        const name = document.getElementById('new-platform-name').value.trim();
+        
+        if (!id || !name) {
+            showToast('请填写完整信息');
+            return;
+        }
+        
+        try {
+            const resp = await fetch('/config/platforms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, name, enabled: true })
+            });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                showToast(data.message);
+                location.reload();
+            } else {
+                showToast(data.detail || '添加失败');
+            }
+        } catch (e) {
+            showToast('请求失败');
+        }
+    }
+
+    // 删除平台
+    async function deletePlatform(id) {
+        if (!confirm('确定要删除该平台吗？')) return;
+        
+        try {
+            const resp = await fetch(`/config/platforms/${id}`, { method: 'DELETE' });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                showToast(data.message);
+                location.reload();
+            } else {
+                showToast(data.detail || '删除失败');
+            }
+        } catch (e) {
+            showToast('请求失败');
+        }
+    }
+
+    // 添加 RSS 源
+    async function addRssFeed() {
+        const id = document.getElementById('new-rss-id').value.trim();
+        const name = document.getElementById('new-rss-name').value.trim();
+        const url = document.getElementById('new-rss-url').value.trim();
+        
+        if (!id || !name || !url) {
+            showToast('请填写完整信息');
+            return;
+        }
+        
+        try {
+            const resp = await fetch('/config/rss/feeds', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, name, url, enabled: true })
+            });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                showToast(data.message);
+                location.reload();
+            } else {
+                showToast(data.detail || '添加失败');
+            }
+        } catch (e) {
+            showToast('请求失败');
+        }
+    }
+
+    // 删除 RSS 源
+    async function deleteRssFeed(id) {
+        if (!confirm('确定要删除该订阅源吗？')) return;
+        
+        try {
+            const resp = await fetch(`/config/rss/feeds/${id}`, { method: 'DELETE' });
+            const data = await resp.json();
+            
+            if (resp.ok) {
+                showToast(data.message);
+                location.reload();
+            } else {
+                showToast(data.detail || '删除失败');
+            }
+        } catch (e) {
+            showToast('请求失败');
+        }
+    }
+
+    // 切换 RSS 开关
+    async function toggleRss() {
+        const enabled = document.getElementById('rss-enabled').checked;
+        await updateConfigItem('rss.enabled', enabled);
+    }
+
+    // 切换通知开关
+    async function toggleNotification() {
+        const enabled = document.getElementById('notification-enabled').checked;
+        await updateConfigItem('notification.enabled', enabled);
+    }
+
+    // 更新通知渠道
+    async function updateChannel(channel, key, value) {
+        try {
+            const resp = await fetch('/config/notification/channel', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    channel, 
+                    config: { [key]: value }
+                })
+            });
+            
+            if (resp.ok) {
+                showToast('已保存');
+            }
+        } catch (e) {
+            showToast('保存失败');
+        }
+    }
+
+    // 更新配置项
+    async function updateConfigItem(key, value) {
+        try {
+            const resp = await fetch('/config/item', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value })
+            });
+            
+            if (resp.ok) {
+                showToast('已保存');
+            }
+        } catch (e) {
+            showToast('保存失败');
+        }
+    }
+</script>
+{% endblock %}
