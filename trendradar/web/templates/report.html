@@ -2,254 +2,60 @@
 
 {% block content %}
 <style>
-    /* 选择器样式 */
-    .selector-group {
+    /* 视图切换 Tab */
+    .view-tabs {
         display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 2px 0;
-        -webkit-overflow-scrolling: touch;
-    }
-    .selector-group::-webkit-scrollbar { display: none; }
-    
-    .selector-btn {
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-size: 13px;
-        white-space: nowrap;
         background: white;
-        color: #6b7280;
-        border: 1px solid #e5e7eb;
-        transition: all 0.2s;
-        touch-action: manipulation;
+        border-radius: 10px;
+        padding: 4px;
+        gap: 4px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    .selector-btn.active {
+    .view-tab {
+        flex: 1;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+        color: #6b7280;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .view-tab.active {
         background: #3b82f6;
         color: white;
-        border-color: #3b82f6;
     }
-    
-    /* 时间选择器 */
-    .time-selector {
-        display: flex;
-        gap: 6px;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding: 4px 0;
-    }
-    .time-btn {
-        padding: 4px 10px;
-        border-radius: 6px;
+    .view-tab .count {
         font-size: 12px;
-        white-space: nowrap;
-        background: #f3f4f6;
-        color: #6b7280;
-        transition: all 0.2s;
-    }
-    .time-btn.active {
-        background: #dbeafe;
-        color: #1d4ed8;
+        opacity: 0.8;
+        margin-left: 4px;
     }
     
-    /* 关键字分组卡片 */
-    .keyword-card {
-        background: white;
-        border-radius: 12px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        overflow: hidden;
-    }
-    .keyword-header {
-        padding: 14px 16px;
-        border-bottom: 1px solid #f3f4f6;
+    /* 控制栏 */
+    .control-bar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-    }
-    .keyword-name {
-        font-weight: 600;
-        color: #1f2937;
-        font-size: 15px;
-    }
-    .keyword-count {
-        font-size: 13px;
-        color: #6b7280;
-        font-weight: 500;
-    }
-    .keyword-count.hot {
-        color: #dc2626;
-    }
-    .keyword-count.warm {
-        color: #ea580c;
-    }
-    .keyword-index {
-        font-size: 12px;
-        color: #9ca3af;
-        margin-left: 12px;
-    }
-    
-    /* 新闻列表 */
-    .news-list {
-        padding: 0;
-    }
-    .news-item {
-        display: flex;
-        padding: 12px 16px;
-        border-bottom: 1px solid #f9fafb;
-        gap: 12px;
-        text-decoration: none;
-        transition: background 0.15s;
-        align-items: flex-start;
-    }
-    .news-item:last-child {
-        border-bottom: none;
-    }
-    .news-item:active {
-        background: #f9fafb;
-    }
-    
-    /* 序号 */
-    .news-number {
-        flex-shrink: 0;
-        width: 22px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        font-size: 11px;
-        font-weight: 600;
-        background: #f3f4f6;
-        color: #9ca3af;
-        margin-top: 2px;
-    }
-    
-    /* 排名标签 */
-    .news-rank {
-        flex-shrink: 0;
-        min-width: 28px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-        background: #6b7280;
-        color: white;
-        margin-top: 2px;
-    }
-    .news-rank.top1 { background: #dc2626; }
-    .news-rank.top2 { background: #ea580c; }
-    .news-rank.top3 { background: #f59e0b; }
-    .news-rank.top10 { background: #3b82f6; }
-    
-    /* 新闻内容区 */
-    .news-content {
-        flex: 1;
-        min-width: 0;
-    }
-    .news-meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
-        flex-wrap: wrap;
-    }
-    .news-platform {
-        font-size: 12px;
-        color: #6b7280;
-        font-weight: 500;
-    }
-    .news-badge {
-        font-size: 10px;
-        font-weight: 600;
-        padding: 1px 5px;
-        border-radius: 3px;
-    }
-    .news-badge.new {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-    .news-badge.count {
-        background: #dcfce7;
-        color: #16a34a;
-    }
-    
-    .news-title {
-        font-size: 14px;
-        color: #374151;
-        line-height: 1.5;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .news-title a {
-        color: inherit;
-        text-decoration: none;
-    }
-    .news-title a:hover {
-        color: #2563eb;
-    }
-    
-    /* 加载状态 */
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(255,255,255,0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 100;
-    }
-    .loading-spinner {
-        width: 32px;
-        height: 32px;
-        border: 3px solid #e5e7eb;
-        border-top-color: #3b82f6;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    
-    /* 空状态 */
-    .empty-state {
-        text-align: center;
-        padding: 48px 24px;
-        color: #9ca3af;
-    }
-    .empty-state svg {
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 16px;
-        opacity: 0.5;
-    }
-    
-    /* 统计栏 */
-    .stats-bar {
-        display: flex;
-        gap: 16px;
         padding: 12px 16px;
         background: white;
         border-radius: 10px;
         margin-bottom: 16px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
-    .stat-item {
-        text-align: center;
+    .control-bar .left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
-    .stat-value {
-        font-size: 20px;
-        font-weight: 700;
+    .control-bar .stats {
+        font-size: 13px;
+        color: #6b7280;
+    }
+    .control-bar .stats strong {
         color: #1f2937;
-    }
-    .stat-label {
-        font-size: 11px;
-        color: #9ca3af;
     }
     
     /* 开关 */
@@ -300,77 +106,281 @@
     input:checked + .toggle-slider:before {
         transform: translateX(16px);
     }
+    
+    /* 操作按钮 */
+    .action-btn {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid #e5e7eb;
+        background: white;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .action-btn:hover {
+        background: #f3f4f6;
+    }
+    .action-btn.primary {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    .action-btn.primary:hover {
+        background: #2563eb;
+    }
+    .action-btn.danger {
+        color: #dc2626;
+        border-color: #fecaca;
+    }
+    .action-btn.danger:hover {
+        background: #fef2f2;
+    }
+    
+    /* 关键字分组卡片 */
+    .keyword-card {
+        background: white;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    .keyword-header {
+        padding: 14px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .keyword-name {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 15px;
+    }
+    .keyword-count {
+        font-size: 13px;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    .keyword-count.hot { color: #dc2626; }
+    .keyword-count.warm { color: #ea580c; }
+    .keyword-index {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-left: 12px;
+    }
+    
+    /* 新闻列表 */
+    .news-list {
+        padding: 0;
+    }
+    .news-item {
+        display: flex;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f9fafb;
+        gap: 10px;
+        transition: all 0.3s ease;
+        align-items: flex-start;
+    }
+    .news-item:last-child {
+        border-bottom: none;
+    }
+    .news-item.fade-out {
+        opacity: 0;
+        transform: translateX(-20px);
+        max-height: 0;
+        padding: 0 16px;
+        overflow: hidden;
+    }
+    .news-item.read {
+        opacity: 0.5;
+    }
+    
+    /* 平台名称链接 */
+    .news-platform {
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 500;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+    .news-platform:hover {
+        color: #3b82f6;
+        text-decoration: underline;
+    }
+    
+    /* 排名标签 */
+    .news-rank {
+        flex-shrink: 0;
+        min-width: 28px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #6b7280;
+        color: white;
+        margin-top: 2px;
+    }
+    .news-rank.top1 { background: #dc2626; }
+    .news-rank.top2 { background: #ea580c; }
+    .news-rank.top3 { background: #f59e0b; }
+    .news-rank.top10 { background: #3b82f6; }
+    
+    /* 新闻内容区 */
+    .news-content {
+        flex: 1;
+        min-width: 0;
+    }
+    .news-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        flex-wrap: wrap;
+    }
+    .news-time {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    .news-badge {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 5px;
+        border-radius: 3px;
+    }
+    .news-badge.count {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+    .news-badge.read-time {
+        background: #f3f4f6;
+        color: #9ca3af;
+    }
+    
+    .news-title {
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.5;
+    }
+    .news-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .news-title a:hover {
+        color: #2563eb;
+    }
+    
+    /* 已读按钮 */
+    .news-actions {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+    }
+    .read-btn {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid #e5e7eb;
+        background: white;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .read-btn:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+    }
+    .read-btn.restore {
+        color: #3b82f6;
+        border-color: #bfdbfe;
+    }
+    .read-btn.restore:hover {
+        background: #eff6ff;
+    }
+    
+    /* 加载状态 */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+    }
+    .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* 空状态 */
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #9ca3af;
+    }
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        opacity: 0.5;
+    }
+    .empty-state .title {
+        font-size: 16px;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
 </style>
 
 <div class="max-w-3xl mx-auto pb-4">
-    <!-- 顶部控制区 -->
-    <div class="mb-4">
-        <!-- 模式选择 -->
-        <div class="mb-3">
-            <div class="text-xs text-gray-500 mb-2">报告模式</div>
-            <div class="selector-group">
-                <button class="selector-btn {% if current_mode == 'daily' %}active{% endif %}" data-mode="daily">
-                    当日汇总
-                </button>
-                <button class="selector-btn {% if current_mode == 'current' or not current_mode %}active{% endif %}" data-mode="current">
-                    当前榜单
-                </button>
-                <button class="selector-btn {% if current_mode == 'incremental' %}active{% endif %}" data-mode="incremental">
-                    增量监控
-                </button>
-            </div>
-        </div>
-        
-        <!-- 日期选择 -->
-        <div class="mb-3">
-            <div class="text-xs text-gray-500 mb-2">选择日期</div>
-            <div class="selector-group" id="date-selector">
-                {% for d in available_dates[:7] %}
-                <button class="selector-btn {% if d == current_date or (not current_date and loop.first) %}active{% endif %}" data-date="{{ d }}">
-                    {{ d[5:] }}
-                </button>
-                {% else %}
-                <span class="text-gray-400 text-sm">暂无数据</span>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <!-- 时间选择（非当日汇总模式显示） -->
-        <div id="time-selector-wrapper" class="mb-3" style="display: none;">
-            <div class="text-xs text-gray-500 mb-2">选择时间点</div>
-            <div class="time-selector" id="time-selector">
-                <span class="text-gray-400 text-sm">加载中...</span>
-            </div>
-        </div>
-        
-        <!-- 关键字过滤开关 -->
-        <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 shadow-sm">
+    <!-- 视图切换 -->
+    <div class="view-tabs mb-4" id="view-tabs">
+        <button class="view-tab active" data-view="unread">
+            未读 <span class="count" id="unread-count">(0)</span>
+        </button>
+        <button class="view-tab" data-view="read">
+            已读 <span class="count" id="read-count">(0)</span>
+        </button>
+        <button class="view-tab" data-view="all">
+            全部
+        </button>
+    </div>
+    
+    <!-- 控制栏 -->
+    <div class="control-bar" id="control-bar">
+        <div class="left">
             <div class="toggle-wrapper">
-                <span class="toggle-label">应用关键字过滤</span>
+                <span class="toggle-label">关键字过滤</span>
                 <label class="toggle-switch">
-                    <input type="checkbox" id="use-keywords" checked>
+                    <input type="checkbox" id="use-keywords" checked onchange="loadReport()">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
-            <button onclick="loadReport()" class="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium">
-                刷新
+            <div class="stats">
+                显示 <strong id="current-count">0</strong> 条
+            </div>
+        </div>
+        <div class="buttons">
+            <button class="action-btn primary" id="mark-all-read-btn" onclick="markAllRead()">
+                全部标为已读
             </button>
-        </div>
-    </div>
-    
-    <!-- 统计信息 -->
-    <div class="stats-bar" id="stats-bar" style="display: none;">
-        <div class="stat-item flex-1">
-            <div class="stat-value" id="stat-keywords">0</div>
-            <div class="stat-label">关键字</div>
-        </div>
-        <div class="stat-item flex-1">
-            <div class="stat-value" id="stat-total">0</div>
-            <div class="stat-label">总条目</div>
-        </div>
-        <div class="stat-item flex-1">
-            <div class="stat-value" id="stat-filtered">0</div>
-            <div class="stat-label">匹配数</div>
+            <button class="action-btn danger" id="clear-history-btn" onclick="clearReadHistory()" style="display: none;">
+                清空已读
+            </button>
         </div>
     </div>
     
@@ -378,9 +388,9 @@
     <div id="report-content">
         <div class="empty-state">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            <div>选择日期和模式后点击刷新</div>
+            <div>加载中...</div>
         </div>
     </div>
     
@@ -394,131 +404,63 @@
 {% block scripts %}
 <script>
     // 当前状态
-    let currentMode = '{{ current_mode or "current" }}';
-    let currentDate = '{{ current_date or "" }}';
-    let currentTime = '{{ current_time or "" }}';
-    let availableTimes = [];
+    let currentView = 'unread';
+    let currentNewsIds = [];
     
     // 初始化
     document.addEventListener('DOMContentLoaded', () => {
-        // 如果没有选中日期，选第一个
-        if (!currentDate) {
-            const firstDate = document.querySelector('#date-selector .selector-btn');
-            if (firstDate) {
-                currentDate = firstDate.dataset.date;
-                firstDate.classList.add('active');
-            }
-        }
-        
-        // 绑定模式选择
-        document.querySelectorAll('[data-mode]').forEach(btn => {
-            btn.onclick = () => selectMode(btn.dataset.mode);
-        });
-        
-        // 绑定日期选择
-        document.querySelectorAll('#date-selector [data-date]').forEach(btn => {
-            btn.onclick = () => selectDate(btn.dataset.date);
+        // 绑定视图切换
+        document.querySelectorAll('[data-view]').forEach(btn => {
+            btn.onclick = () => selectView(btn.dataset.view);
         });
         
         // 初始加载
-        updateUI();
-        if (currentDate) {
-            loadTimes();
-        }
+        loadReport();
     });
     
-    // 选择模式
-    function selectMode(mode) {
-        currentMode = mode;
-        document.querySelectorAll('[data-mode]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
+    // 选择视图
+    function selectView(view) {
+        currentView = view;
+        document.querySelectorAll('[data-view]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === view);
         });
-        updateUI();
-        if (currentMode !== 'daily' && currentDate) {
-            loadTimes();
-        } else {
-            loadReport();
-        }
-    }
-    
-    // 选择日期
-    function selectDate(date) {
-        currentDate = date;
-        currentTime = '';
-        document.querySelectorAll('#date-selector [data-date]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.date === date);
-        });
-        if (currentMode !== 'daily') {
-            loadTimes();
-        } else {
-            loadReport();
-        }
-    }
-    
-    // 选择时间
-    function selectTime(time) {
-        currentTime = time;
-        document.querySelectorAll('#time-selector [data-time]').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.time === time);
-        });
+        updateActionBar();
         loadReport();
     }
     
-    // 更新UI
-    function updateUI() {
-        const timeWrapper = document.getElementById('time-selector-wrapper');
-        if (currentMode === 'daily') {
-            timeWrapper.style.display = 'none';
-        } else {
-            timeWrapper.style.display = 'block';
-        }
-    }
-    
-    // 加载可用时间点
-    async function loadTimes() {
-        if (!currentDate) return;
+    // 更新操作栏
+    function updateActionBar() {
+        const markAllBtn = document.getElementById('mark-all-read-btn');
+        const clearBtn = document.getElementById('clear-history-btn');
         
-        try {
-            const resp = await fetch(`/api/report/times?date=${currentDate}`);
-            const data = await resp.json();
-            availableTimes = data.times || [];
-            
-            const container = document.getElementById('time-selector');
-            if (availableTimes.length === 0) {
-                container.innerHTML = '<span class="text-gray-400 text-sm">该日期无数据</span>';
-                return;
-            }
-            
-            container.innerHTML = availableTimes.map((t, i) => {
-                const timeStr = t.slice(11, 16); // 取 HH:MM
-                const isActive = currentTime === t || (!currentTime && i === 0);
-                if (!currentTime && i === 0) currentTime = t;
-                return `<button class="time-btn ${isActive ? 'active' : ''}" data-time="${t}" onclick="selectTime('${t}')">${timeStr}</button>`;
-            }).join('');
-            
-            loadReport();
-        } catch (e) {
-            console.error('加载时间点失败:', e);
+        if (currentView === 'unread') {
+            markAllBtn.style.display = 'inline-block';
+            clearBtn.style.display = 'none';
+        } else if (currentView === 'read') {
+            markAllBtn.style.display = 'none';
+            clearBtn.style.display = 'inline-block';
+        } else {
+            markAllBtn.style.display = 'inline-block';
+            clearBtn.style.display = 'none';
         }
     }
     
     // 加载报告数据
     async function loadReport() {
-        if (!currentDate) return;
-        
         const useKeywords = document.getElementById('use-keywords').checked;
         
-        // 显示加载
         document.getElementById('loading-overlay').style.display = 'flex';
         
         try {
-            let url = `/api/report/data?mode=${currentMode}&date=${currentDate}&use_keywords=${useKeywords}`;
-            if (currentMode !== 'daily' && currentTime) {
-                url += `&time=${encodeURIComponent(currentTime)}`;
-            }
-            
+            const url = `/api/report/data?days=7&use_keywords=${useKeywords}&view=${currentView}`;
             const resp = await fetch(url);
             const data = await resp.json();
+            
+            // 更新统计
+            if (data.read_stats) {
+                document.getElementById('unread-count').textContent = `(${data.read_stats.unread_count})`;
+                document.getElementById('read-count').textContent = `(${data.read_stats.read_count})`;
+            }
             
             renderReport(data);
         } catch (e) {
@@ -528,7 +470,8 @@
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
-                    <div>加载失败，请重试</div>
+                    <div class="title">加载失败</div>
+                    <div>请刷新页面重试</div>
                 </div>
             `;
         } finally {
@@ -536,39 +479,53 @@
         }
     }
     
-    // 渲染报告（按关键字分组）
+    // 渲染报告
     function renderReport(data) {
         const container = document.getElementById('report-content');
-        const statsBar = document.getElementById('stats-bar');
-        
         const keywordGroups = data.keyword_groups || [];
+        currentNewsIds = [];
+        
+        // 收集所有新闻ID
+        keywordGroups.forEach(group => {
+            group.items.forEach(item => {
+                if (!currentNewsIds.includes(item.id)) {
+                    currentNewsIds.push(item.id);
+                }
+            });
+        });
+        
+        // 更新显示数量
+        document.getElementById('current-count').textContent = currentNewsIds.length;
         
         if (keywordGroups.length === 0) {
-            statsBar.style.display = 'none';
+            let emptyMsg = '暂无数据';
+            let emptyIcon = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+            
+            if (currentView === 'unread') {
+                emptyMsg = '太棒了，全部已读！';
+                emptyIcon = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z';
+            } else if (currentView === 'read') {
+                emptyMsg = '还没有阅读记录';
+                emptyIcon = 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253';
+            }
+            
             container.innerHTML = `
                 <div class="empty-state">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="${emptyIcon}"/>
                     </svg>
-                    <div>${data.use_keywords ? '无匹配关键字的内容' : '该时间段暂无数据'}</div>
+                    <div class="title">${emptyMsg}</div>
                 </div>
             `;
             return;
         }
         
-        // 更新统计
-        statsBar.style.display = 'flex';
-        document.getElementById('stat-keywords').textContent = keywordGroups.length;
-        document.getElementById('stat-total').textContent = data.total_items;
-        document.getElementById('stat-filtered').textContent = data.filtered_items;
-        
-        // 渲染关键字分组卡片
+        // 渲染关键字分组
         let html = '';
         const totalGroups = keywordGroups.length;
         
         keywordGroups.forEach((group, groupIndex) => {
             const count = group.count;
-            // 热度等级
             let countClass = '';
             if (count >= 10) countClass = 'hot';
             else if (count >= 5) countClass = 'warm';
@@ -593,30 +550,43 @@
                 else if (rank === 3) rankClass = 'top3';
                 else if (rank <= 10) rankClass = 'top10';
                 
+                const readClass = item.is_read ? 'read' : '';
+                const timeDisplay = formatTime(item.publish_time || item.first_time);
+                
                 html += `
-                    <div class="news-item">
-                        <span class="news-number">${itemIndex + 1}</span>
+                    <div class="news-item ${readClass}" data-news-id="${item.id}">
                         <span class="news-rank ${rankClass}">${rank || '-'}</span>
                         <div class="news-content">
                             <div class="news-meta">
-                                <span class="news-platform">${escapeHtml(item.platform_name)}</span>
+                                <span class="news-platform" onclick="gotoPlatform('${item.platform_id}')">${escapeHtml(item.platform_name)}</span>
+                                <span class="news-time">${timeDisplay}</span>
                 `;
                 
-                // 增量模式显示 NEW 标记
-                if (item.is_new && currentMode === 'incremental') {
-                    html += `<span class="news-badge new">NEW</span>`;
+                if (item.appear_count > 1) {
+                    html += `<span class="news-badge count">${item.appear_count}次</span>`;
                 }
                 
-                // 当日汇总模式显示出现次数
-                if (currentMode === 'daily' && item.appear_count > 1) {
-                    html += `<span class="news-badge count">${item.appear_count}次</span>`;
+                if (item.is_read && item.read_at) {
+                    const readTime = formatReadTime(item.read_at);
+                    html += `<span class="news-badge read-time">${readTime}已读</span>`;
                 }
                 
                 html += `
                             </div>
                             <div class="news-title">
-                                <a href="${escapeHtml(item.url)}" target="_blank">${escapeHtml(item.title)}</a>
+                                <a href="${escapeHtml(item.url)}" target="_blank" onclick="markRead(${item.id}, this)">${escapeHtml(item.title)}</a>
                             </div>
+                        </div>
+                        <div class="news-actions">
+                `;
+                
+                if (item.is_read) {
+                    html += `<button class="read-btn restore" onclick="unmarkRead(${item.id}, this)">恢复</button>`;
+                } else {
+                    html += `<button class="read-btn" onclick="markRead(${item.id}, this)">已读</button>`;
+                }
+                
+                html += `
                         </div>
                     </div>
                 `;
@@ -629,6 +599,160 @@
         });
         
         container.innerHTML = html;
+    }
+    
+    // 跳转到平台新闻列表
+    function gotoPlatform(platformId) {
+        window.location.href = `/news?platform=${platformId}`;
+    }
+    
+    // 标记已读
+    async function markRead(newsId, element) {
+        try {
+            await fetch(`/api/news/${newsId}/read`, { method: 'POST' });
+            
+            // 不管在哪个视图，都只更新样式，不移除元素
+            const newsItem = element.closest('.news-item');
+            if (newsItem) {
+                newsItem.classList.add('read');
+                const btn = newsItem.querySelector('.read-btn');
+                if (btn) {
+                    btn.className = 'read-btn restore';
+                    btn.textContent = '恢复';
+                    btn.onclick = () => unmarkRead(newsId, btn);
+                }
+                // 添加已读标记
+                const meta = newsItem.querySelector('.news-meta');
+                if (meta && !meta.querySelector('.news-badge.read-time')) {
+                    const badge = document.createElement('span');
+                    badge.className = 'news-badge read-time';
+                    badge.textContent = '刚刚已读';
+                    meta.appendChild(badge);
+                }
+            }
+            
+            updateReadCounts();
+        } catch (e) {
+            console.error('标记已读失败:', e);
+        }
+    }
+    
+    // 取消已读
+    async function unmarkRead(newsId, element) {
+        try {
+            await fetch(`/api/news/${newsId}/read`, { method: 'DELETE' });
+            
+            // 不管在哪个视图，都只更新样式，不移除元素
+            const newsItem = element.closest('.news-item');
+            if (newsItem) {
+                newsItem.classList.remove('read');
+                const btn = newsItem.querySelector('.read-btn');
+                if (btn) {
+                    btn.className = 'read-btn';
+                    btn.textContent = '已读';
+                    btn.onclick = () => markRead(newsId, btn);
+                }
+                // 移除已读标记
+                const readBadge = newsItem.querySelector('.news-badge.read-time');
+                if (readBadge) {
+                    readBadge.remove();
+                }
+            }
+            
+            updateReadCounts();
+        } catch (e) {
+            console.error('取消已读失败:', e);
+        }
+    }
+    
+    // 全部标为已读
+    async function markAllRead() {
+        if (currentNewsIds.length === 0) return;
+        
+        if (!confirm(`确定将当前 ${currentNewsIds.length} 条新闻全部标为已读？`)) {
+            return;
+        }
+        
+        try {
+            await fetch('/api/news/batch-read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ news_ids: currentNewsIds })
+            });
+            
+            loadReport();
+        } catch (e) {
+            console.error('批量标记失败:', e);
+        }
+    }
+    
+    // 清空已读记录
+    async function clearReadHistory() {
+        if (!confirm('确定清空所有已读记录？此操作不可恢复。')) {
+            return;
+        }
+        
+        try {
+            await fetch('/api/news/read-history', { method: 'DELETE' });
+            loadReport();
+        } catch (e) {
+            console.error('清空失败:', e);
+        }
+    }
+    
+    // 更新阅读统计
+    async function updateReadCounts() {
+        try {
+            const resp = await fetch('/api/news/read-stats');
+            const stats = await resp.json();
+            document.getElementById('unread-count').textContent = `(${stats.unread_count})`;
+            document.getElementById('read-count').textContent = `(${stats.read_count})`;
+        } catch (e) {
+            console.error('更新统计失败:', e);
+        }
+    }
+    
+    // 更新当前显示统计
+    function updateStats() {
+        const items = document.querySelectorAll('.news-item:not(.fade-out)');
+        document.getElementById('current-count').textContent = items.length;
+        
+        if (items.length === 0) {
+            setTimeout(() => loadReport(), 300);
+        }
+    }
+    
+    // 格式化时间（相对时间）
+    function formatTime(isoTime) {
+        const date = new Date(isoTime);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return '刚刚';
+        if (diffMins < 60) return `${diffMins}分钟前`;
+        if (diffHours < 24) return `${diffHours}小时前`;
+        if (diffDays === 1) return '昨天';
+        if (diffDays < 7) return `${diffDays}天前`;
+        return date.toLocaleDateString();
+    }
+    
+    // 格式化阅读时间
+    function formatReadTime(isoTime) {
+        const date = new Date(isoTime);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return '刚刚';
+        if (diffMins < 60) return `${diffMins}分钟前`;
+        if (diffHours < 24) return `${diffHours}小时前`;
+        if (diffDays < 7) return `${diffDays}天前`;
+        return date.toLocaleDateString();
     }
     
     // HTML转义

@@ -14,6 +14,11 @@ from datetime import datetime
 DEFAULT_DB_PATH = "data/trendradar.db"
 
 
+def get_minute_timestamp() -> str:
+    """获取分钟级别的时间戳（精确到分钟，不含秒和微秒）"""
+    return datetime.now().strftime('%Y-%m-%dT%H:%M:00')
+
+
 class Database:
     """统一数据库管理类"""
     
@@ -99,15 +104,16 @@ class Database:
                 is_active = excluded.is_active,
                 updated_at = excluded.updated_at
         """, (platform_id, name, platform_type, feed_url, is_active, 
-              datetime.now().isoformat()))
+              get_minute_timestamp()))
     
     def update_platform_status(self, platform_id: str, status: str) -> None:
         """更新平台抓取状态"""
+        now = get_minute_timestamp()
         self.execute("""
             UPDATE platforms 
             SET last_fetch_time = ?, last_fetch_status = ?, updated_at = ?
             WHERE id = ?
-        """, (datetime.now().isoformat(), status, datetime.now().isoformat(), platform_id))
+        """, (now, status, now, platform_id))
     
     # ========== 新闻管理 ==========
     
@@ -139,12 +145,13 @@ class Database:
         
         where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
         
+        # 时间已存储为分钟级别，直接排序即可
         sql = f"""
             SELECT n.*, p.name as platform_name, p.type as platform_type
             FROM news_items n
             JOIN platforms p ON n.platform_id = p.id
             {where_clause}
-            ORDER BY n.last_crawl_time DESC, n.rank ASC
+            ORDER BY COALESCE(NULLIF(n.published_at, ''), n.first_crawl_time) DESC, n.rank ASC
             LIMIT ? OFFSET ?
         """
         params.extend([limit, offset])
@@ -192,7 +199,7 @@ class Database:
                     summary: str = '', author: str = '',
                     published_at: Optional[str] = None) -> int:
         """插入或更新新闻"""
-        now = datetime.now().isoformat()
+        now = get_minute_timestamp()
         
         # 先尝试查找现有记录
         existing = self.execute(
@@ -284,7 +291,7 @@ class Database:
     def record_crawl(self, crawl_type: str = 'hotlist', 
                      total_items: int = 0) -> int:
         """记录一次抓取"""
-        now = datetime.now().isoformat()
+        now = get_minute_timestamp()
         self.execute("""
             INSERT INTO crawl_records (crawl_time, crawl_type, total_items)
             VALUES (?, ?, ?)
@@ -371,12 +378,92 @@ class Database:
             ON CONFLICT(key) DO UPDATE SET 
                 value = excluded.value,
                 updated_at = excluded.updated_at
-        """, (key, value, datetime.now().isoformat()))
+        """, (key, value, get_minute_timestamp()))
     
     def get_all_config(self) -> Dict[str, str]:
         """获取所有配置项"""
         result = self.execute("SELECT key, value FROM app_config")
         return {r['key']: r['value'] for r in result}
+    
+    # ========== 阅读状态管理 ==========
+    
+    def mark_news_read(self, news_id: int) -> bool:
+        """标记单条新闻为已读"""
+        try:
+            self.execute("""
+                INSERT OR REPLACE INTO news_read_status (news_id, read_at)
+                VALUES (?, ?)
+            """, (news_id, get_minute_timestamp()))
+            return True
+        except Exception:
+            return False
+    
+    def mark_news_batch_read(self, news_ids: List[int]) -> int:
+        """批量标记新闻为已读"""
+        if not news_ids:
+            return 0
+        now = get_minute_timestamp()
+        params_list = [(news_id, now) for news_id in news_ids]
+        return self.execute_many("""
+            INSERT OR REPLACE INTO news_read_status (news_id, read_at)
+            VALUES (?, ?)
+        """, params_list)
+    
+    def unmark_news_read(self, news_id: int) -> bool:
+        """取消已读标记（恢复为未读）"""
+        try:
+            self.execute(
+                "DELETE FROM news_read_status WHERE news_id = ?",
+                (news_id,)
+            )
+            return True
+        except Exception:
+            return False
+    
+    def clear_read_history(self) -> int:
+        """清空所有已读记录"""
+        result = self.execute("SELECT COUNT(*) as count FROM news_read_status")
+        count = result[0]['count'] if result else 0
+        self.execute("DELETE FROM news_read_status")
+        return count
+    
+    def get_read_news_ids(self) -> set:
+        """获取所有已读新闻ID集合"""
+        result = self.execute("SELECT news_id FROM news_read_status")
+        return {r['news_id'] for r in result}
+    
+    def get_read_news_map(self) -> Dict[int, str]:
+        """获取已读新闻ID到阅读时间的映射"""
+        result = self.execute("SELECT news_id, read_at FROM news_read_status")
+        return {r['news_id']: r['read_at'] for r in result}
+    
+    def get_read_stats(self, date: Optional[str] = None) -> Dict[str, int]:
+        """获取阅读统计"""
+        # 总已读数
+        result = self.execute("SELECT COUNT(*) as count FROM news_read_status")
+        read_count = result[0]['count'] if result else 0
+        
+        # 如果指定日期，计算该日期的未读数
+        if date:
+            result = self.execute("""
+                SELECT COUNT(*) as count FROM news_items n
+                WHERE DATE(n.first_crawl_time) = ?
+                  AND n.id NOT IN (SELECT news_id FROM news_read_status)
+            """, (date,))
+            unread_count = result[0]['count'] if result else 0
+        else:
+            # 总未读数（最近7天的）
+            result = self.execute("""
+                SELECT COUNT(*) as count FROM news_items n
+                WHERE n.first_crawl_time >= datetime('now', '-7 days')
+                  AND n.id NOT IN (SELECT news_id FROM news_read_status)
+            """)
+            unread_count = result[0]['count'] if result else 0
+        
+        return {
+            "unread_count": unread_count,
+            "read_count": read_count
+        }
 
 
 # 便捷函数

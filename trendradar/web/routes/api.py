@@ -52,6 +52,20 @@ class CrawlStatusResponse(BaseModel):
     message: str
 
 
+class ReadStatusResponse(BaseModel):
+    success: bool
+    message: str = ""
+
+
+class BatchReadRequest(BaseModel):
+    news_ids: List[int]
+
+
+class ReadStatsResponse(BaseModel):
+    unread_count: int
+    read_count: int
+
+
 # ========== API 端点 ==========
 
 @router.get("/news", response_model=NewsListResponse)
@@ -92,6 +106,38 @@ async def get_news(
         page=page,
         page_size=page_size,
         total_pages=total_pages
+    )
+
+
+# ========== 阅读状态 API (静态路由必须在 /news/{news_id} 之前) ==========
+
+@router.get("/news/read-stats", response_model=ReadStatsResponse)
+async def get_read_stats(date: Optional[str] = Query(None, description="日期 YYYY-MM-DD")):
+    """获取阅读统计"""
+    db = get_db()
+    stats = db.get_read_stats(date)
+    return ReadStatsResponse(**stats)
+
+
+@router.post("/news/batch-read", response_model=ReadStatusResponse)
+async def mark_news_batch_read(request: BatchReadRequest):
+    """批量标记新闻为已读"""
+    db = get_db()
+    count = db.mark_news_batch_read(request.news_ids)
+    return ReadStatusResponse(
+        success=True,
+        message=f"已标记 {count} 条为已读"
+    )
+
+
+@router.delete("/news/read-history", response_model=ReadStatusResponse)
+async def clear_read_history():
+    """清空所有已读记录"""
+    db = get_db()
+    count = db.clear_read_history()
+    return ReadStatusResponse(
+        success=True,
+        message=f"已清空 {count} 条已读记录"
     )
 
 
@@ -370,27 +416,21 @@ async def get_report_times(date: Optional[str] = Query(None, description="日期
 
 @router.get("/report/data")
 async def get_report_data(
-    mode: str = Query("current", description="报告模式: daily/current/incremental"),
-    date: Optional[str] = Query(None, description="日期 YYYY-MM-DD"),
-    time: Optional[str] = Query(None, description="具体时间点"),
-    use_keywords: bool = Query(True, description="是否应用关键字过滤")
+    days: int = Query(7, description="获取最近几天的数据，默认7天"),
+    use_keywords: bool = Query(True, description="是否应用关键字过滤"),
+    view: str = Query("unread", description="视图模式: unread/read/all")
 ):
     """
-    获取报告数据（按关键字分组）
+    获取报告数据（按关键字分组，时间线模式）
     
-    - mode: 报告模式
-      - daily: 当日汇总，聚合指定日期所有数据
-      - current: 当前榜单，显示指定时间点的完整榜单
-      - incremental: 增量模式，显示指定时间点新增的内容
-    - date: 日期，默认今天
-    - time: 具体抓取时间点（仅 current/incremental 模式有效）
+    - days: 获取最近几天的数据（默认7天）
     - use_keywords: 是否应用关键字过滤
+    - view: 视图模式
+      - unread: 只显示未读（默认）
+      - read: 只显示已读
+      - all: 显示全部
     """
     db = get_db()
-    config = get_config_manager()
-    
-    if date is None:
-        date = datetime.now().strftime("%Y-%m-%d")
     
     # 加载关键字配置
     word_groups = []
@@ -403,153 +443,91 @@ async def get_report_data(
             if keywords_path.exists():
                 word_groups, filter_words, global_filters = load_frequency_words(str(keywords_path))
         except Exception:
-            pass  # 如果加载失败，不使用关键字过滤
+            pass
     
     # 获取平台信息
     platforms = db.get_platforms(platform_type='hotlist')
     platform_map = {p['id']: p['name'] for p in platforms}
     
+    # 获取已读新闻ID集合和映射
+    read_news_ids = db.get_read_news_ids()
+    read_news_map = db.get_read_news_map() if view in ("read", "all") else {}
+    
     result = {
-        "mode": mode,
-        "date": date,
-        "time": time,
+        "days": days,
         "use_keywords": use_keywords,
-        "keyword_groups": [],  # 按关键字分组
+        "view": view,
+        "keyword_groups": [],
         "total_items": 0,
         "filtered_items": 0,
+        "read_stats": {"unread_count": 0, "read_count": 0},
         "generated_at": datetime.now().isoformat()
     }
     
     # 用于收集按关键字分组的新闻
     keyword_news_map = {}  # { keyword: [news_items] }
     
-    # 确定抓取时间
-    crawl_time = None
-    prev_time = None
-    
-    if mode == "daily":
-        # 当日汇总不需要具体时间点
-        pass
-    elif mode in ("current", "incremental"):
-        if time:
-            crawl_time = time
-        else:
-            latest = db.execute("""
-                SELECT crawl_time FROM crawl_records 
-                WHERE DATE(crawl_time) = ?
-                ORDER BY crawl_time DESC LIMIT 1
-            """, (date,))
-            crawl_time = latest[0]['crawl_time'] if latest else None
-        
-        if mode == "incremental" and crawl_time:
-            prev = db.execute("""
-                SELECT crawl_time FROM crawl_records 
-                WHERE DATE(crawl_time) = ? AND crawl_time < ?
-                ORDER BY crawl_time DESC LIMIT 1
-            """, (date, crawl_time))
-            prev_time = prev[0]['crawl_time'] if prev else None
-        
-        result["time"] = crawl_time
-        if mode == "incremental":
-            result["prev_time"] = prev_time
-    
-    # 遍历所有平台获取新闻
+    # 获取最近 N 天的所有新闻，按时间倒序
     for platform in platforms:
         platform_id = platform['id']
         platform_name = platform['name']
         
-        news_items = []
-        
-        if mode == "daily":
-            # 当日汇总：聚合该日期所有数据
-            news_items = db.execute("""
-                SELECT n.*, 
-                       MIN(rh.rank) as best_rank,
-                       COUNT(rh.id) as appear_count
-                FROM news_items n
-                LEFT JOIN rank_history rh ON n.id = rh.news_item_id
-                WHERE n.platform_id = ?
-                  AND DATE(n.first_crawl_time) = ?
-                GROUP BY n.id
-                ORDER BY best_rank ASC, appear_count DESC
-                LIMIT 50
-            """, (platform_id, date))
-            
-        elif mode == "current" and crawl_time:
-            # 当前榜单：获取指定时间点的数据
-            news_items = db.execute("""
-                SELECT DISTINCT n.*, rh.rank as current_rank
-                FROM news_items n
-                JOIN rank_history rh ON n.id = rh.news_item_id
-                WHERE n.platform_id = ?
-                  AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
-                ORDER BY rh.rank ASC
-                LIMIT 50
-            """, (platform_id, crawl_time))
-            
-        elif mode == "incremental" and crawl_time:
-            # 增量模式：只显示新增内容
-            if prev_time:
-                news_items = db.execute("""
-                    SELECT DISTINCT n.*, rh.rank as current_rank
-                    FROM news_items n
-                    JOIN rank_history rh ON n.id = rh.news_item_id
-                    WHERE n.platform_id = ?
-                      AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
-                      AND n.id NOT IN (
-                          SELECT DISTINCT n2.id
-                          FROM news_items n2
-                          JOIN rank_history rh2 ON n2.id = rh2.news_item_id
-                          WHERE n2.platform_id = ?
-                            AND ABS(JULIANDAY(rh2.crawl_time) - JULIANDAY(?)) < 0.0035
-                      )
-                    ORDER BY rh.rank ASC
-                    LIMIT 50
-                """, (platform_id, crawl_time, platform_id, prev_time))
-            else:
-                news_items = db.execute("""
-                    SELECT DISTINCT n.*, rh.rank as current_rank
-                    FROM news_items n
-                    JOIN rank_history rh ON n.id = rh.news_item_id
-                    WHERE n.platform_id = ?
-                      AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
-                    ORDER BY rh.rank ASC
-                    LIMIT 50
-                """, (platform_id, crawl_time))
+        # 查询最近 N 天的新闻，按发布时间（或首次抓取时间）倒序，同时间按排名升序
+        # 时间已存储为分钟级别，直接排序即可
+        news_items = db.execute("""
+            SELECT n.*, 
+                   MIN(rh.rank) as best_rank,
+                   COUNT(rh.id) as appear_count,
+                   COALESCE(NULLIF(n.published_at, ''), n.first_crawl_time) as sort_time
+            FROM news_items n
+            LEFT JOIN rank_history rh ON n.id = rh.news_item_id
+            WHERE n.platform_id = ?
+              AND n.first_crawl_time >= datetime('now', '-' || ? || ' days', 'localtime')
+            GROUP BY n.id
+            ORDER BY sort_time DESC, best_rank ASC
+            LIMIT 100
+        """, (platform_id, days))
         
         # 处理新闻条目
         for item in news_items:
             result["total_items"] += 1
             
             title = item['title']
+            news_id = item['id']
+            is_read = news_id in read_news_ids
+            
+            # 根据 view 过滤
+            if view == "unread" and is_read:
+                continue
+            elif view == "read" and not is_read:
+                continue
             
             # 获取匹配的关键字词组
             if use_keywords and word_groups:
                 matched_keywords = get_matched_groups(title, word_groups, filter_words, global_filters)
                 if not matched_keywords:
-                    continue  # 不匹配任何关键字，跳过
+                    continue
             else:
-                # 不使用关键字过滤时，放入"全部新闻"分组
                 matched_keywords = ["全部新闻"]
             
             result["filtered_items"] += 1
             
-            # 构建新闻数据
+            # 构建新闻数据，使用发布时间（如果有）或首次抓取时间
+            publish_time = item.get('published_at') or item['first_crawl_time']
             news_data = {
-                "id": item['id'],
+                "id": news_id,
                 "title": title,
                 "platform_id": platform_id,
                 "platform_name": platform_name,
                 "url": item['url'],
-                "rank": item.get('current_rank') or item.get('best_rank') or item['rank'],
-                "is_new": mode == "incremental",
+                "rank": item.get('best_rank') or item['rank'],
+                "is_read": is_read,
+                "read_at": read_news_map.get(news_id),
+                "publish_time": publish_time,
                 "first_time": item['first_crawl_time'],
-                "last_time": item.get('last_crawl_time', item['first_crawl_time'])
+                "last_time": item.get('last_crawl_time', item['first_crawl_time']),
+                "appear_count": item.get('appear_count', 1)
             }
-            
-            # daily 模式额外信息
-            if mode == "daily":
-                news_data["appear_count"] = item.get('appear_count', 1)
             
             # 将新闻添加到每个匹配的关键字分组中
             for keyword in matched_keywords:
@@ -559,8 +537,18 @@ async def get_report_data(
     
     # 构建关键字分组结果，按匹配数量排序
     for keyword, items in sorted(keyword_news_map.items(), key=lambda x: -len(x[1])):
-        # 对每个分组内的新闻按排名排序
-        sorted_items = sorted(items, key=lambda x: (x['rank'] or 999))
+        # 对每个分组内的新闻排序：先按发布时间倒序，同时间按排名升序
+        # 时间已存储为分钟级别，可以直接字符串比较
+        def sort_key(x):
+            time_str = x['publish_time'] or ''
+            rank_val = x['rank'] or 999
+            return (-hash(time_str), time_str, rank_val)  # 字符串越大时间越晚，取负实现倒序
+        # 简化：直接用元组排序，时间倒序用 reverse
+        sorted_items = sorted(items, key=lambda x: (x['publish_time'] or '', x['rank'] or 999), reverse=True)
+        # reverse=True 会导致 rank 也倒序，需要修正
+        # 改用分步排序：先按 rank 升序，再按时间倒序（稳定排序）
+        sorted_items = sorted(items, key=lambda x: x['rank'] or 999)
+        sorted_items = sorted(sorted_items, key=lambda x: x['publish_time'] or '', reverse=True)
         
         result["keyword_groups"].append({
             "keyword": keyword,
@@ -568,4 +556,31 @@ async def get_report_data(
             "items": sorted_items
         })
     
+    # 获取阅读统计
+    result["read_stats"] = db.get_read_stats()
+    
     return result
+
+
+# ========== 阅读状态 API (动态路由部分) ==========
+
+@router.post("/news/{news_id}/read", response_model=ReadStatusResponse)
+async def mark_news_read(news_id: int):
+    """标记单条新闻为已读"""
+    db = get_db()
+    success = db.mark_news_read(news_id)
+    return ReadStatusResponse(
+        success=success,
+        message="已标记为已读" if success else "标记失败"
+    )
+
+
+@router.delete("/news/{news_id}/read", response_model=ReadStatusResponse)
+async def unmark_news_read(news_id: int):
+    """取消已读标记（恢复为未读）"""
+    db = get_db()
+    success = db.unmark_news_read(news_id)
+    return ReadStatusResponse(
+        success=success,
+        message="已恢复为未读" if success else "操作失败"
+    )

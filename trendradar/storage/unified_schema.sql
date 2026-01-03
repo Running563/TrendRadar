@@ -134,6 +134,16 @@ CREATE TABLE IF NOT EXISTS notification_channels (
 );
 
 -- ============================================
+-- 新闻阅读状态表（用户已读标记）
+-- ============================================
+CREATE TABLE IF NOT EXISTS news_read_status (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    news_id INTEGER NOT NULL UNIQUE,
+    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (news_id) REFERENCES news_items(id) ON DELETE CASCADE
+);
+
+-- ============================================
 -- 索引定义
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_news_platform ON news_items(platform_id);
@@ -146,6 +156,8 @@ CREATE INDEX IF NOT EXISTS idx_crawl_status_record ON crawl_source_status(crawl_
 CREATE INDEX IF NOT EXISTS idx_rank_history_news ON rank_history(news_item_id);
 CREATE INDEX IF NOT EXISTS idx_platforms_type ON platforms(type);
 CREATE INDEX IF NOT EXISTS idx_crawl_records_type ON crawl_records(crawl_type);
+CREATE INDEX IF NOT EXISTS idx_news_read_status_news_id ON news_read_status(news_id);
+CREATE INDEX IF NOT EXISTS idx_news_read_status_read_at ON news_read_status(read_at DESC);
 
 -- ============================================
 -- 初始化默认配置（如果不存在）
