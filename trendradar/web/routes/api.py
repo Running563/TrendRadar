@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from pathlib import Path
 
 from trendradar.web.app import get_db, get_config_manager
-from trendradar.core.frequency import load_frequency_words, matches_word_groups
+from trendradar.core.frequency import load_frequency_words, matches_word_groups, get_matched_groups
 
 router = APIRouter(tags=["api"])
 
@@ -376,7 +376,7 @@ async def get_report_data(
     use_keywords: bool = Query(True, description="是否应用关键字过滤")
 ):
     """
-    获取报告数据
+    获取报告数据（按关键字分组）
     
     - mode: 报告模式
       - daily: 当日汇总，聚合指定日期所有数据
@@ -414,18 +414,54 @@ async def get_report_data(
         "date": date,
         "time": time,
         "use_keywords": use_keywords,
-        "platforms": [],
+        "keyword_groups": [],  # 按关键字分组
         "total_items": 0,
         "filtered_items": 0,
         "generated_at": datetime.now().isoformat()
     }
     
+    # 用于收集按关键字分组的新闻
+    keyword_news_map = {}  # { keyword: [news_items] }
+    
+    # 确定抓取时间
+    crawl_time = None
+    prev_time = None
+    
     if mode == "daily":
-        # 当日汇总：聚合该日期所有数据
-        for platform in platforms:
-            platform_id = platform['id']
-            
-            # 获取该平台该日期的所有新闻，按最高排名排序
+        # 当日汇总不需要具体时间点
+        pass
+    elif mode in ("current", "incremental"):
+        if time:
+            crawl_time = time
+        else:
+            latest = db.execute("""
+                SELECT crawl_time FROM crawl_records 
+                WHERE DATE(crawl_time) = ?
+                ORDER BY crawl_time DESC LIMIT 1
+            """, (date,))
+            crawl_time = latest[0]['crawl_time'] if latest else None
+        
+        if mode == "incremental" and crawl_time:
+            prev = db.execute("""
+                SELECT crawl_time FROM crawl_records 
+                WHERE DATE(crawl_time) = ? AND crawl_time < ?
+                ORDER BY crawl_time DESC LIMIT 1
+            """, (date, crawl_time))
+            prev_time = prev[0]['crawl_time'] if prev else None
+        
+        result["time"] = crawl_time
+        if mode == "incremental":
+            result["prev_time"] = prev_time
+    
+    # 遍历所有平台获取新闻
+    for platform in platforms:
+        platform_id = platform['id']
+        platform_name = platform['name']
+        
+        news_items = []
+        
+        if mode == "daily":
+            # 当日汇总：聚合该日期所有数据
             news_items = db.execute("""
                 SELECT n.*, 
                        MIN(rh.rank) as best_rank,
@@ -439,57 +475,8 @@ async def get_report_data(
                 LIMIT 50
             """, (platform_id, date))
             
-            filtered_news = []
-            for item in news_items:
-                # 应用关键字过滤
-                if use_keywords and word_groups:
-                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
-                        continue
-                
-                filtered_news.append({
-                    "id": item['id'],
-                    "title": item['title'],
-                    "url": item['url'],
-                    "rank": item['best_rank'] or item['rank'],
-                    "appear_count": item['appear_count'] or 1,
-                    "first_time": item['first_crawl_time'],
-                    "last_time": item['last_crawl_time']
-                })
-            
-            if filtered_news:
-                result["platforms"].append({
-                    "id": platform_id,
-                    "name": platform['name'],
-                    "items": filtered_news,
-                    "total": len(news_items),
-                    "filtered": len(filtered_news)
-                })
-                result["total_items"] += len(news_items)
-                result["filtered_items"] += len(filtered_news)
-    
-    elif mode == "current":
-        # 当前榜单：获取指定时间点的数据
-        if time:
-            # 使用指定时间点
-            crawl_time = time
-        else:
-            # 获取最新的抓取时间
-            latest = db.execute("""
-                SELECT crawl_time FROM crawl_records 
-                WHERE DATE(crawl_time) = ?
-                ORDER BY crawl_time DESC LIMIT 1
-            """, (date,))
-            crawl_time = latest[0]['crawl_time'] if latest else None
-        
-        if not crawl_time:
-            return result
-        
-        result["time"] = crawl_time
-        
-        for platform in platforms:
-            platform_id = platform['id']
-            
-            # 获取该时间点前后的数据（允许5分钟误差）
+        elif mode == "current" and crawl_time:
+            # 当前榜单：获取指定时间点的数据
             news_items = db.execute("""
                 SELECT DISTINCT n.*, rh.rank as current_rank
                 FROM news_items n
@@ -500,64 +487,9 @@ async def get_report_data(
                 LIMIT 50
             """, (platform_id, crawl_time))
             
-            filtered_news = []
-            for item in news_items:
-                if use_keywords and word_groups:
-                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
-                        continue
-                
-                filtered_news.append({
-                    "id": item['id'],
-                    "title": item['title'],
-                    "url": item['url'],
-                    "rank": item['current_rank'] or item['rank'],
-                    "first_time": item['first_crawl_time'],
-                    "last_time": item['last_crawl_time']
-                })
-            
-            if filtered_news:
-                result["platforms"].append({
-                    "id": platform_id,
-                    "name": platform['name'],
-                    "items": filtered_news,
-                    "total": len(news_items),
-                    "filtered": len(filtered_news)
-                })
-                result["total_items"] += len(news_items)
-                result["filtered_items"] += len(filtered_news)
-    
-    elif mode == "incremental":
-        # 增量模式：只显示新增内容
-        if time:
-            crawl_time = time
-            # 获取上一个时间点
-            prev = db.execute("""
-                SELECT crawl_time FROM crawl_records 
-                WHERE DATE(crawl_time) = ? AND crawl_time < ?
-                ORDER BY crawl_time DESC LIMIT 1
-            """, (date, time))
-            prev_time = prev[0]['crawl_time'] if prev else None
-        else:
-            # 获取最新两个时间点
-            records = db.execute("""
-                SELECT crawl_time FROM crawl_records 
-                WHERE DATE(crawl_time) = ?
-                ORDER BY crawl_time DESC LIMIT 2
-            """, (date,))
-            if len(records) >= 1:
-                crawl_time = records[0]['crawl_time']
-                prev_time = records[1]['crawl_time'] if len(records) >= 2 else None
-            else:
-                return result
-        
-        result["time"] = crawl_time
-        result["prev_time"] = prev_time
-        
-        for platform in platforms:
-            platform_id = platform['id']
-            
+        elif mode == "incremental" and crawl_time:
+            # 增量模式：只显示新增内容
             if prev_time:
-                # 获取新增的内容（当前有但上次没有的）
                 news_items = db.execute("""
                     SELECT DISTINCT n.*, rh.rank as current_rank
                     FROM news_items n
@@ -575,7 +507,6 @@ async def get_report_data(
                     LIMIT 50
                 """, (platform_id, crawl_time, platform_id, prev_time))
             else:
-                # 如果没有上一次记录，显示所有当前数据
                 news_items = db.execute("""
                     SELECT DISTINCT n.*, rh.rank as current_rank
                     FROM news_items n
@@ -585,31 +516,56 @@ async def get_report_data(
                     ORDER BY rh.rank ASC
                     LIMIT 50
                 """, (platform_id, crawl_time))
+        
+        # 处理新闻条目
+        for item in news_items:
+            result["total_items"] += 1
             
-            filtered_news = []
-            for item in news_items:
-                if use_keywords and word_groups:
-                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
-                        continue
-                
-                filtered_news.append({
-                    "id": item['id'],
-                    "title": item['title'],
-                    "url": item['url'],
-                    "rank": item['current_rank'] or item['rank'],
-                    "is_new": True,
-                    "first_time": item['first_crawl_time']
-                })
+            title = item['title']
             
-            if filtered_news:
-                result["platforms"].append({
-                    "id": platform_id,
-                    "name": platform['name'],
-                    "items": filtered_news,
-                    "total": len(news_items),
-                    "filtered": len(filtered_news)
-                })
-                result["total_items"] += len(news_items)
-                result["filtered_items"] += len(filtered_news)
+            # 获取匹配的关键字词组
+            if use_keywords and word_groups:
+                matched_keywords = get_matched_groups(title, word_groups, filter_words, global_filters)
+                if not matched_keywords:
+                    continue  # 不匹配任何关键字，跳过
+            else:
+                # 不使用关键字过滤时，放入"全部新闻"分组
+                matched_keywords = ["全部新闻"]
+            
+            result["filtered_items"] += 1
+            
+            # 构建新闻数据
+            news_data = {
+                "id": item['id'],
+                "title": title,
+                "platform_id": platform_id,
+                "platform_name": platform_name,
+                "url": item['url'],
+                "rank": item.get('current_rank') or item.get('best_rank') or item['rank'],
+                "is_new": mode == "incremental",
+                "first_time": item['first_crawl_time'],
+                "last_time": item.get('last_crawl_time', item['first_crawl_time'])
+            }
+            
+            # daily 模式额外信息
+            if mode == "daily":
+                news_data["appear_count"] = item.get('appear_count', 1)
+            
+            # 将新闻添加到每个匹配的关键字分组中
+            for keyword in matched_keywords:
+                if keyword not in keyword_news_map:
+                    keyword_news_map[keyword] = []
+                keyword_news_map[keyword].append(news_data)
+    
+    # 构建关键字分组结果，按匹配数量排序
+    for keyword, items in sorted(keyword_news_map.items(), key=lambda x: -len(x[1])):
+        # 对每个分组内的新闻按排名排序
+        sorted_items = sorted(items, key=lambda x: (x['rank'] or 999))
+        
+        result["keyword_groups"].append({
+            "keyword": keyword,
+            "count": len(sorted_items),
+            "items": sorted_items
+        })
     
     return result

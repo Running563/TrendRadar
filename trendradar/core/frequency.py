@@ -192,3 +192,70 @@ def matches_word_groups(
         return True
 
     return False
+
+
+def get_matched_groups(
+    title: str,
+    word_groups: List[Dict],
+    filter_words: List[str],
+    global_filters: Optional[List[str]] = None
+) -> List[str]:
+    """
+    获取标题匹配的所有词组
+
+    Args:
+        title: 标题文本
+        word_groups: 词组列表
+        filter_words: 过滤词列表
+        global_filters: 全局过滤词列表
+
+    Returns:
+        匹配的词组 group_key 列表
+    """
+    # 防御性类型检查：确保 title 是有效字符串
+    if not isinstance(title, str):
+        title = str(title) if title is not None else ""
+    if not title.strip():
+        return []
+
+    title_lower = title.lower()
+
+    # 全局过滤检查（优先级最高）
+    if global_filters:
+        if any(global_word.lower() in title_lower for global_word in global_filters):
+            return []
+
+    # 如果没有配置词组，返回空（无法分组）
+    if not word_groups:
+        return []
+
+    # 过滤词检查
+    if any(filter_word.lower() in title_lower for filter_word in filter_words):
+        return []
+
+    # 词组匹配检查，收集所有匹配的词组
+    matched_groups = []
+    for group in word_groups:
+        required_words = group["required"]
+        normal_words = group["normal"]
+
+        # 必须词检查
+        if required_words:
+            all_required_present = all(
+                req_word.lower() in title_lower for req_word in required_words
+            )
+            if not all_required_present:
+                continue
+
+        # 普通词检查
+        if normal_words:
+            any_normal_present = any(
+                normal_word.lower() in title_lower for normal_word in normal_words
+            )
+            if not any_normal_present:
+                continue
+
+        # 匹配成功，添加到结果
+        matched_groups.append(group["group_key"])
+
+    return matched_groups
