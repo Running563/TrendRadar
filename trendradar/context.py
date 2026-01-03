@@ -139,29 +139,19 @@ class AppContext:
     # === 存储操作 ===
 
     def get_storage_manager(self):
-        """获取存储管理器（延迟初始化，单例）"""
+        """获取存储管理器（延迟初始化，单例）
+        
+        简化版：只支持本地 SQLite 存储
+        """
         if self._storage_manager is None:
             storage_config = self.config.get("STORAGE", {})
-            remote_config = storage_config.get("REMOTE", {})
             local_config = storage_config.get("LOCAL", {})
-            pull_config = storage_config.get("PULL", {})
 
             self._storage_manager = get_storage_manager(
-                backend_type=storage_config.get("BACKEND", "auto"),
-                data_dir=local_config.get("DATA_DIR", "output"),
-                enable_txt=storage_config.get("FORMATS", {}).get("TXT", True),
+                data_dir=local_config.get("DATA_DIR", "data"),
+                enable_txt=storage_config.get("FORMATS", {}).get("TXT", False),
                 enable_html=storage_config.get("FORMATS", {}).get("HTML", True),
-                remote_config={
-                    "bucket_name": remote_config.get("BUCKET_NAME", ""),
-                    "access_key_id": remote_config.get("ACCESS_KEY_ID", ""),
-                    "secret_access_key": remote_config.get("SECRET_ACCESS_KEY", ""),
-                    "endpoint_url": remote_config.get("ENDPOINT_URL", ""),
-                    "region": remote_config.get("REGION", ""),
-                },
-                local_retention_days=local_config.get("RETENTION_DAYS", 0),
-                remote_retention_days=remote_config.get("RETENTION_DAYS", 0),
-                pull_enabled=pull_config.get("ENABLED", False),
-                pull_days=pull_config.get("DAYS", 7),
+                retention_days=local_config.get("RETENTION_DAYS", 0),
                 timezone=self.timezone,
             )
         return self._storage_manager

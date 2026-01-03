@@ -449,58 +449,88 @@ class DataService:
 
     def get_current_config(self, section: str = "all") -> Dict:
         """
-        获取当前系统配置
+        获取当前系统配置（从数据库读取）
 
         Args:
             section: 配置节 - all/crawler/push/keywords/weights
 
         Returns:
             配置字典
-
-        Raises:
-            FileParseError: 配置文件解析错误
         """
+        import json
+        from trendradar.storage.database import Database, DEFAULT_DB_PATH
+        
         # 尝试从缓存获取
         cache_key = f"config:{section}"
         cached = self.cache.get(cache_key, ttl=3600)  # 1小时缓存
         if cached:
             return cached
 
-        # 解析配置文件
-        config_data = self.parser.parse_yaml_config()
-        word_groups = self.parser.parse_frequency_words()
+        # 从数据库读取配置
+        db = Database.get_instance(DEFAULT_DB_PATH)
+        
+        def get_config(key, default=None):
+            result = db.execute("SELECT value FROM app_config WHERE key = ?", (key,))
+            if result:
+                try:
+                    return json.loads(result[0]['value'])
+                except:
+                    return result[0]['value']
+            return default
 
-        # 根据section返回对应配置
-        advanced = config_data.get("advanced", {})
-        advanced_crawler = advanced.get("crawler", {})
+        # 获取平台列表
+        platforms_result = db.execute("""
+            SELECT id FROM platforms WHERE type = 'hotlist' AND is_active = 1
+        """)
+        platforms = [r['id'] for r in platforms_result]
+
+        # 获取关键词配置
+        word_groups = self.parser.parse_frequency_words()
 
         if section == "all" or section == "crawler":
             crawler_config = {
-                "enable_crawler": advanced_crawler.get("enabled", True),
-                "use_proxy": advanced_crawler.get("use_proxy", False),
-                "request_interval": advanced_crawler.get("request_interval", 1),
+                "enable_crawler": get_config("advanced.crawler.enabled", True),
+                "use_proxy": get_config("advanced.crawler.use_proxy", False),
+                "request_interval": get_config("advanced.crawler.request_interval", 1000),
                 "retry_times": 3,
-                "platforms": [p["id"] for p in config_data.get("platforms", [])]
+                "platforms": platforms
             }
 
         if section == "all" or section == "push":
-            notification = config_data.get("notification", {})
-            batch_size = advanced.get("batch_size", {})
+            # 获取通知渠道
+            channels_result = db.execute("SELECT channel, enabled, config FROM notification_channels")
+            enabled_channels = []
+            for r in channels_result:
+                if r['enabled']:
+                    try:
+                        config = json.loads(r['config'])
+                        # 检查是否有有效配置
+                        if r['channel'] in ['feishu', 'dingtalk', 'wework', 'slack']:
+                            if config.get('webhook_url'):
+                                enabled_channels.append(r['channel'])
+                        elif r['channel'] == 'telegram':
+                            if config.get('bot_token') and config.get('chat_id'):
+                                enabled_channels.append(r['channel'])
+                        elif r['channel'] == 'ntfy':
+                            if config.get('topic'):
+                                enabled_channels.append(r['channel'])
+                        elif r['channel'] == 'bark':
+                            if config.get('url'):
+                                enabled_channels.append(r['channel'])
+                    except:
+                        pass
+            
             push_config = {
-                "enable_notification": notification.get("enabled", True),
-                "enabled_channels": [],
-                "message_batch_size": batch_size.get("default", 4000),
-                "push_window": notification.get("push_window", {})
+                "enable_notification": get_config("notification.enabled", False),
+                "enabled_channels": enabled_channels,
+                "message_batch_size": get_config("advanced.batch_size.default", 4000),
+                "push_window": {
+                    "enabled": get_config("notification.push_window.enabled", False),
+                    "start": get_config("notification.push_window.start", "20:00"),
+                    "end": get_config("notification.push_window.end", "22:00"),
+                    "once_per_day": get_config("notification.push_window.once_per_day", True)
+                }
             }
-
-            # 检测已配置的通知渠道
-            channels = notification.get("channels", {})
-            if channels.get("feishu", {}).get("webhook_url"):
-                push_config["enabled_channels"].append("feishu")
-            if channels.get("dingtalk", {}).get("webhook_url"):
-                push_config["enabled_channels"].append("dingtalk")
-            if channels.get("wework", {}).get("webhook_url"):
-                push_config["enabled_channels"].append("wework")
 
         if section == "all" or section == "keywords":
             keywords_config = {
@@ -509,11 +539,10 @@ class DataService:
             }
 
         if section == "all" or section == "weights":
-            weight = advanced.get("weight", {})
             weights_config = {
-                "rank_weight": weight.get("rank", 0.6),
-                "frequency_weight": weight.get("frequency", 0.3),
-                "hotness_weight": weight.get("hotness", 0.1)
+                "rank_weight": get_config("advanced.weight.rank", 0.6),
+                "frequency_weight": get_config("advanced.weight.frequency", 0.3),
+                "hotness_weight": get_config("advanced.weight.hotness", 0.1)
             }
 
         # 组装结果

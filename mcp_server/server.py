@@ -123,8 +123,8 @@ async def get_latest_news(
 
     Args:
         platforms: 平台ID列表，如 ['zhihu', 'weibo', 'douyin']
-                   - 不指定时：使用 config.yaml 中配置的所有平台
-                   - 支持的平台来自 config/config.yaml 的 platforms 配置
+                   - 不指定时：使用 数据库 中配置的所有平台
+                   - 支持的平台来自 config/数据库 的 platforms 配置
                    - 每个平台都有对应的name字段（如"知乎"、"微博"），方便AI识别
         limit: 返回条数限制，默认50，最大1000
                注意：实际返回数量可能少于请求值，取决于当前可用的新闻总数
@@ -196,7 +196,7 @@ async def get_latest_rss(
     Args:
         feeds: RSS 源 ID 列表，如 ['hacker-news', '36kr']
                - 不指定时：返回所有已配置 RSS 源的数据
-               - 支持的 RSS 源来自 config/config.yaml 的 rss.feeds 配置
+               - 支持的 RSS 源来自 config/数据库 的 rss.feeds 配置
         limit: 返回条数限制，默认50，最大500
         include_summary: 是否包含文章摘要，默认False（节省token）
 
@@ -302,8 +302,8 @@ async def get_news_by_date(
             - 单日字符串: "2025-01-15"
             - 默认值: "今天"
         platforms: 平台ID列表，如 ['zhihu', 'weibo', 'douyin']
-                   - 不指定时：使用 config.yaml 中配置的所有平台
-                   - 支持的平台来自 config/config.yaml 的 platforms 配置
+                   - 不指定时：使用 数据库 中配置的所有平台
+                   - 支持的平台来自 config/数据库 的 platforms 配置
                    - 每个平台都有对应的name字段（如"知乎"、"微博"），方便AI识别
         limit: 返回条数限制，默认50，最大1000
                注意：实际返回数量可能少于请求值，取决于指定日期的新闻总数
@@ -464,8 +464,8 @@ async def analyze_sentiment(
     Args:
         topic: 话题关键词（可选）
         platforms: 平台ID列表，如 ['zhihu', 'weibo', 'douyin']
-                   - 不指定时：使用 config.yaml 中配置的所有平台
-                   - 支持的平台来自 config/config.yaml 的 platforms 配置
+                   - 不指定时：使用 数据库 中配置的所有平台
+                   - 支持的平台来自 config/数据库 的 platforms 配置
                    - 每个平台都有对应的name字段（如"知乎"、"微博"），方便AI识别
         date_range: 日期范围（可选）
                     - **格式**: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}
@@ -738,8 +738,8 @@ async def search_news(
                     - **获取方式**: 调用 resolve_date_range 工具解析自然语言日期
                     - **默认**: 不指定时默认查询今天的新闻
         platforms: 平台ID列表，如 ['zhihu', 'weibo', 'douyin']
-                   - 不指定时：使用 config.yaml 中配置的所有平台
-                   - 支持的平台来自 config/config.yaml 的 platforms 配置
+                   - 不指定时：使用 数据库 中配置的所有平台
+                   - 支持的平台来自 config/数据库 的 platforms 配置
                    - 每个平台都有对应的name字段（如"知乎"、"微博"），方便AI识别
         limit: 热榜返回条数限制，默认50，最大1000
                注意：实际返回数量取决于搜索匹配结果（特别是 fuzzy 模式下会过滤低相似度结果）
@@ -851,8 +851,8 @@ async def trigger_crawl(
 
     Args:
         platforms: 指定平台ID列表，如 ['zhihu', 'weibo', 'douyin']
-                   - 不指定时：使用 config.yaml 中配置的所有平台
-                   - 支持的平台来自 config/config.yaml 的 platforms 配置
+                   - 不指定时：使用 数据库 中配置的所有平台
+                   - 支持的平台来自 config/数据库 的 platforms 配置
                    - 每个平台都有对应的name字段（如"知乎"、"微博"），方便AI识别
                    - 注意：失败的平台会在返回结果的 failed_platforms 字段中列出
         save_to_local: 是否保存到本地 output 目录，默认 False
@@ -868,7 +868,7 @@ async def trigger_crawl(
     Examples:
         - 临时爬取: trigger_crawl(platforms=['zhihu'])
         - 爬取并保存: trigger_crawl(platforms=['weibo'], save_to_local=True)
-        - 使用默认平台: trigger_crawl()  # 爬取config.yaml中配置的所有平台
+        - 使用默认平台: trigger_crawl()  # 爬取数据库中配置的所有平台
     """
     tools = _get_tools()
     result = tools['system'].trigger_crawl(platforms=platforms, save_to_local=save_to_local, include_url=include_url)
@@ -882,36 +882,15 @@ async def sync_from_remote(
     days: int = 7
 ) -> str:
     """
-    从远程存储拉取数据到本地
+    从远程存储拉取数据到本地（已禁用）
 
-    用于 MCP Server 等场景：爬虫存到远程云存储（如 Cloudflare R2），
-    MCP Server 拉取到本地进行分析查询。
+    此功能已在简化版中禁用。当前版本仅支持本地 SQLite 存储。
 
     Args:
-        days: 拉取最近 N 天的数据，默认 7 天
-              - 0: 不拉取
-              - 7: 拉取最近一周的数据
-              - 30: 拉取最近一个月的数据
+        days: 拉取最近 N 天的数据
 
     Returns:
-        JSON格式的同步结果，包含：
-        - success: 是否成功
-        - synced_files: 成功同步的文件数量
-        - synced_dates: 成功同步的日期列表
-        - skipped_dates: 跳过的日期（本地已存在）
-        - failed_dates: 失败的日期及错误信息
-        - message: 操作结果描述
-
-    Examples:
-        - sync_from_remote()  # 拉取最近7天
-        - sync_from_remote(days=30)  # 拉取最近30天
-
-    Note:
-        需要在 config/config.yaml 中配置远程存储（storage.remote）或设置环境变量：
-        - S3_ENDPOINT_URL: 服务端点
-        - S3_BUCKET_NAME: 存储桶名称
-        - S3_ACCESS_KEY_ID: 访问密钥 ID
-        - S3_SECRET_ACCESS_KEY: 访问密钥
+        提示远程存储已禁用的信息
     """
     tools = _get_tools()
     result = tools['storage'].sync_from_remote(days=days)
@@ -923,11 +902,11 @@ async def get_storage_status() -> str:
     """
     获取存储配置和状态
 
-    查看当前存储后端配置、本地和远程存储的状态信息。
+    查看当前本地存储的状态信息（简化版仅支持本地 SQLite 存储）。
 
     Returns:
         JSON格式的存储状态信息，包含：
-        - backend: 当前使用的后端类型（local/remote/auto）
+        - backend: 当前使用的后端类型（local）
         - local: 本地存储状态
             - data_dir: 数据目录
             - retention_days: 保留天数
@@ -935,17 +914,9 @@ async def get_storage_status() -> str:
             - date_count: 日期数量
             - earliest_date: 最早日期
             - latest_date: 最新日期
-        - remote: 远程存储状态
-            - configured: 是否已配置
-            - endpoint_url: 服务端点
-            - bucket_name: 存储桶名称
-            - date_count: 远程日期数量
-        - pull: 拉取配置
-            - enabled: 是否启用自动拉取
-            - days: 自动拉取天数
 
     Examples:
-        - get_storage_status()  # 查看所有存储状态
+        - get_storage_status()  # 查看存储状态
     """
     tools = _get_tools()
     result = tools['storage'].get_storage_status()
@@ -957,39 +928,27 @@ async def list_available_dates(
     source: str = "both"
 ) -> str:
     """
-    列出本地/远程可用的日期范围
+    列出本地可用的日期范围
 
-    查看本地和远程存储中有哪些日期的数据可用，
-    帮助了解数据覆盖范围和同步状态。
+    查看本地存储中有哪些日期的数据可用。
 
     Args:
         source: 数据来源，可选值：
-            - "local": 仅列出本地可用日期
-            - "remote": 仅列出远程可用日期
-            - "both": 同时列出两者并进行对比（默认）
+            - "local": 列出本地可用日期（推荐）
+            - "remote": 已禁用
+            - "both": 同时列出（远程部分已禁用）
 
     Returns:
         JSON格式的日期列表，包含：
-        - local: 本地日期信息（如果 source 包含 local）
+        - local: 本地日期信息
             - dates: 日期列表（按时间倒序）
             - count: 日期数量
             - earliest: 最早日期
             - latest: 最新日期
-        - remote: 远程日期信息（如果 source 包含 remote）
-            - configured: 是否已配置远程存储
-            - dates: 日期列表
-            - count: 日期数量
-            - earliest: 最早日期
-            - latest: 最新日期
-        - comparison: 对比结果（仅当 source="both" 时）
-            - only_local: 仅本地存在的日期
-            - only_remote: 仅远程存在的日期
-            - both: 两边都存在的日期
 
     Examples:
-        - list_available_dates()  # 查看本地和远程的对比
-        - list_available_dates(source="local")  # 仅查看本地
-        - list_available_dates(source="remote")  # 仅查看远程
+        - list_available_dates()  # 查看本地可用日期
+        - list_available_dates(source="local")  # 查看本地
     """
     tools = _get_tools()
     result = tools['storage'].list_available_dates(source=source)

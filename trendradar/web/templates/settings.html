@@ -1,157 +1,364 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto">
-    <h1 class="text-2xl font-bold text-gray-800 mb-6">系统设置</h1>
-    
-    <!-- 提示信息 -->
-    {% if request.query_params.get('saved') %}
-    <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
-        配置已保存成功！
-    </div>
-    {% endif %}
-    {% if request.query_params.get('error') %}
-    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-        保存失败: {{ request.query_params.get('error') }}
-    </div>
-    {% endif %}
+<style>
+    /* 开关样式 */
+    .toggle-switch {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+        display: inline-block;
+        vertical-align: middle;
+    }
+    .toggle-switch.small {
+        width: 40px;
+        height: 22px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #d1d5db;
+        transition: .2s;
+        border-radius: 24px;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .2s;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .toggle-switch.small .toggle-slider:before {
+        height: 16px;
+        width: 16px;
+    }
+    input:checked + .toggle-slider {
+        background-color: #3b82f6;
+    }
+    input:checked + .toggle-slider:before {
+        transform: translateX(20px);
+    }
+    .toggle-switch.small input:checked + .toggle-slider:before {
+        transform: translateX(18px);
+    }
+    /* 列表项样式 */
+    .list-item {
+        display: flex;
+        align-items: center;
+        padding: 14px 0;
+        border-bottom: 1px solid #f3f4f6;
+        min-height: 56px;
+    }
+    .list-item:last-child {
+        border-bottom: none;
+    }
+    /* 防止滑动误触 */
+    .list-container {
+        touch-action: pan-y;
+        -webkit-overflow-scrolling: touch;
+    }
+    .list-item .toggle-switch,
+    .list-item .delete-btn {
+        touch-action: manipulation;
+    }
+    /* 输入框样式 */
+    .channel-input {
+        width: 100%;
+        padding: 10px 12px;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s;
+        outline: none;
+    }
+    .channel-input:focus {
+        background: white;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .channel-input::placeholder {
+        color: #9ca3af;
+    }
+    /* 值预览样式 */
+    .value-preview {
+        color: #6b7280;
+        font-size: 12px;
+        word-break: break-all;
+        max-height: 36px;
+        overflow: hidden;
+    }
+    .value-preview.empty {
+        color: #9ca3af;
+        font-style: italic;
+    }
+</style>
 
-    <!-- 配置编辑 -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="border-b px-4 py-3">
-            <h2 class="font-medium text-gray-800">配置文件编辑</h2>
-            <p class="text-sm text-gray-500 mt-1">直接编辑 YAML 配置文件，保存后立即生效（无需重启）</p>
+<div class="max-w-2xl mx-auto pb-8">
+    <!-- Toast -->
+    <div id="toast" class="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg transform -translate-y-20 transition-transform duration-300 z-50 text-sm">
+        <span id="toast-message"></span>
+    </div>
+
+    <!-- 热榜平台 -->
+    <section class="mb-6">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <h2 class="text-base font-semibold text-gray-800">热榜平台</h2>
+            <button onclick="openPlatformModal()" class="text-primary text-sm font-medium">添加</button>
         </div>
-        
-        <form action="/config/save" method="post">
-            <div class="p-4">
-                <textarea name="config_content" rows="30" 
-                    class="w-full font-mono text-sm p-4 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary bg-gray-50"
-                    spellcheck="false">{{ config_raw }}</textarea>
-            </div>
-            
-            <div class="px-4 py-3 bg-gray-50 border-t flex justify-between items-center">
-                <div class="text-sm text-gray-500">
-                    提示: 修改后点击保存，配置会立即生效
-                </div>
-                <div class="space-x-3">
-                    <button type="button" onclick="resetConfig()" class="px-4 py-2 text-gray-600 hover:text-primary">
-                        重置
-                    </button>
-                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
-                        保存配置
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-
-    <!-- 快捷配置 -->
-    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- 平台管理 -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-4 py-3">
-                <h2 class="font-medium text-gray-800">热榜平台</h2>
-            </div>
-            <div class="p-4">
-                <ul class="space-y-2" id="platforms-list">
-                    {% for p in config.platforms %}
-                    <li class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded">
-                        <span class="text-sm">{{ p.name }} <span class="text-gray-400">({{ p.id }})</span></span>
-                        <button type="button" onclick="deletePlatform('{{ p.id }}')" class="text-red-500 hover:text-red-700 text-sm">
-                            删除
-                        </button>
-                    </li>
-                    {% endfor %}
-                </ul>
-                <div class="mt-4 flex gap-2">
-                    <input type="text" id="new-platform-id" placeholder="平台ID" class="flex-1 px-3 py-2 border rounded text-sm">
-                    <input type="text" id="new-platform-name" placeholder="平台名称" class="flex-1 px-3 py-2 border rounded text-sm">
-                    <button type="button" onclick="addPlatform()" class="px-3 py-2 bg-primary text-white rounded text-sm">添加</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- RSS 管理 -->
-        <div class="bg-white rounded-lg shadow">
-            <div class="border-b px-4 py-3 flex justify-between items-center">
-                <h2 class="font-medium text-gray-800">RSS 订阅源</h2>
-                <label class="flex items-center text-sm">
-                    <input type="checkbox" id="rss-enabled" {% if config.rss.enabled %}checked{% endif %} onchange="toggleRss()" class="mr-2">
-                    启用 RSS
-                </label>
-            </div>
-            <div class="p-4">
-                <ul class="space-y-2" id="rss-feeds-list">
-                    {% for f in config.rss.feeds %}
-                    <li class="py-2 px-3 bg-gray-50 rounded">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-medium">{{ f.name }}</span>
-                            <button type="button" onclick="deleteRssFeed('{{ f.id }}')" class="text-red-500 hover:text-red-700 text-sm">
-                                删除
-                            </button>
-                        </div>
-                        <div class="text-xs text-gray-400 mt-1 truncate">{{ f.url }}</div>
-                    </li>
-                    {% else %}
-                    <li class="text-center text-gray-400 py-4 text-sm">暂无 RSS 订阅源</li>
-                    {% endfor %}
-                </ul>
-                <div class="mt-4 space-y-2">
-                    <div class="flex gap-2">
-                        <input type="text" id="new-rss-id" placeholder="源ID" class="w-24 px-3 py-2 border rounded text-sm">
-                        <input type="text" id="new-rss-name" placeholder="名称" class="flex-1 px-3 py-2 border rounded text-sm">
+        <div class="bg-white rounded-xl shadow-sm list-container">
+            <div class="px-4">
+                {% for p in config.platforms %}
+                <div class="list-item">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">{{ p.name }}</div>
+                        <div class="text-xs text-gray-400">{{ p.id }}</div>
                     </div>
-                    <div class="flex gap-2">
-                        <input type="text" id="new-rss-url" placeholder="RSS URL" class="flex-1 px-3 py-2 border rounded text-sm">
-                        <button type="button" onclick="addRssFeed()" class="px-3 py-2 bg-primary text-white rounded text-sm">添加</button>
-                    </div>
+                    <label class="toggle-switch mr-3">
+                        <input type="checkbox" id="platform-{{ p.id }}" {% if p.enabled %}checked{% endif %} onchange="togglePlatform('{{ p.id }}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <button onclick="deletePlatform('{{ p.id }}', '{{ p.name }}')" class="delete-btn text-gray-300 hover:text-red-500 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 通知配置 -->
-    <div class="mt-6 bg-white rounded-lg shadow">
-        <div class="border-b px-4 py-3 flex justify-between items-center">
-            <h2 class="font-medium text-gray-800">通知推送</h2>
-            <label class="flex items-center text-sm">
-                <input type="checkbox" id="notification-enabled" {% if config.notification.enabled %}checked{% endif %} onchange="toggleNotification()" class="mr-2">
-                启用通知
-            </label>
-        </div>
-        <div class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {% for channel, channel_config in config.notification.channels.items() %}
-                <div class="border rounded-lg p-3">
-                    <h3 class="font-medium text-sm text-gray-700 mb-2">{{ channel | capitalize }}</h3>
-                    {% if 'webhook_url' in channel_config %}
-                    <input type="text" id="channel-{{ channel }}-webhook" 
-                        value="{{ channel_config.webhook_url }}" 
-                        placeholder="Webhook URL"
-                        class="w-full px-3 py-2 border rounded text-sm"
-                        onchange="updateChannel('{{ channel }}', 'webhook_url', this.value)">
-                    {% elif 'bot_token' in channel_config %}
-                    <input type="text" id="channel-{{ channel }}-token" 
-                        value="{{ channel_config.bot_token }}" 
-                        placeholder="Bot Token"
-                        class="w-full px-3 py-2 border rounded text-sm mb-2"
-                        onchange="updateChannel('{{ channel }}', 'bot_token', this.value)">
-                    <input type="text" id="channel-{{ channel }}-chat" 
-                        value="{{ channel_config.chat_id }}" 
-                        placeholder="Chat ID"
-                        class="w-full px-3 py-2 border rounded text-sm"
-                        onchange="updateChannel('{{ channel }}', 'chat_id', this.value)">
-                    {% elif 'url' in channel_config %}
-                    <input type="text" id="channel-{{ channel }}-url" 
-                        value="{{ channel_config.url }}" 
-                        placeholder="URL"
-                        class="w-full px-3 py-2 border rounded text-sm"
-                        onchange="updateChannel('{{ channel }}', 'url', this.value)">
-                    {% endif %}
-                </div>
+                {% else %}
+                <div class="py-8 text-center text-gray-400 text-sm">暂无平台</div>
                 {% endfor %}
             </div>
+        </div>
+    </section>
+
+    <!-- RSS 订阅源 -->
+    <section class="mb-6">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <h2 class="text-base font-semibold text-gray-800">RSS 订阅源</h2>
+                <label class="toggle-switch small">
+                    <input type="checkbox" id="rss-enabled" {% if config.rss.enabled %}checked{% endif %} onchange="toggleRss(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <button onclick="openRssModal()" class="text-primary text-sm font-medium">添加</button>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm list-container">
+            <div class="px-4">
+                {% for f in config.rss.feeds %}
+                <div class="list-item">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">{{ f.name }}</div>
+                        <div class="text-xs text-gray-400 truncate">{{ f.url }}</div>
+                    </div>
+                    <label class="toggle-switch mr-3">
+                        <input type="checkbox" id="rss-{{ f.id }}" {% if f.enabled %}checked{% endif %} onchange="toggleRssFeed('{{ f.id }}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <button onclick="deleteRssFeed('{{ f.id }}', '{{ f.name }}')" class="delete-btn text-gray-300 hover:text-red-500 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+                {% else %}
+                <div class="py-8 text-center text-gray-400 text-sm">暂无订阅源</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- 通知推送 -->
+    <section class="mb-6">
+        <div class="flex items-center justify-between mb-3 px-1">
+            <div class="flex items-center gap-2">
+                <h2 class="text-base font-semibold text-gray-800">通知推送</h2>
+                <label class="toggle-switch small">
+                    <input type="checkbox" id="notification-enabled" {% if config.notification.enabled %}checked{% endif %} onchange="toggleNotification(this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm list-container">
+            <div class="px-4">
+                <!-- 飞书 -->
+                <div class="list-item" onclick="openChannelModal('feishu', '飞书', [{key:'webhook_url',label:'Webhook URL',value:'{{ config.notification.channels.feishu.webhook_url | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">飞书</div>
+                        <div class="value-preview {% if not config.notification.channels.feishu.webhook_url %}empty{% endif %}">
+                            {{ config.notification.channels.feishu.webhook_url | default('未设置', true) }}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- 钉钉 -->
+                <div class="list-item" onclick="openChannelModal('dingtalk', '钉钉', [{key:'webhook_url',label:'Webhook URL',value:'{{ config.notification.channels.dingtalk.webhook_url | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">钉钉</div>
+                        <div class="value-preview {% if not config.notification.channels.dingtalk.webhook_url %}empty{% endif %}">
+                            {{ config.notification.channels.dingtalk.webhook_url | default('未设置', true) }}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- 企业微信 -->
+                <div class="list-item" onclick="openChannelModal('wework', '企业微信', [{key:'webhook_url',label:'Webhook URL',value:'{{ config.notification.channels.wework.webhook_url | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">企业微信</div>
+                        <div class="value-preview {% if not config.notification.channels.wework.webhook_url %}empty{% endif %}">
+                            {{ config.notification.channels.wework.webhook_url | default('未设置', true) }}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- Telegram -->
+                <div class="list-item" onclick="openChannelModal('telegram', 'Telegram', [{key:'bot_token',label:'Bot Token',value:'{{ config.notification.channels.telegram.bot_token | default("", true) }}'},{key:'chat_id',label:'Chat ID',value:'{{ config.notification.channels.telegram.chat_id | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">Telegram</div>
+                        <div class="value-preview {% if not config.notification.channels.telegram.bot_token %}empty{% endif %}">
+                            {% if config.notification.channels.telegram.bot_token %}
+                            Token: {{ config.notification.channels.telegram.bot_token[:20] }}...
+                            {% else %}
+                            未设置
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- Bark -->
+                <div class="list-item" onclick="openChannelModal('bark', 'Bark', [{key:'url',label:'Bark URL',value:'{{ config.notification.channels.bark.url | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">Bark</div>
+                        <div class="value-preview {% if not config.notification.channels.bark.url %}empty{% endif %}">
+                            {{ config.notification.channels.bark.url | default('未设置', true) }}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- Slack -->
+                <div class="list-item" onclick="openChannelModal('slack', 'Slack', [{key:'webhook_url',label:'Webhook URL',value:'{{ config.notification.channels.slack.webhook_url | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">Slack</div>
+                        <div class="value-preview {% if not config.notification.channels.slack.webhook_url %}empty{% endif %}">
+                            {{ config.notification.channels.slack.webhook_url | default('未设置', true) }}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+                <!-- Ntfy -->
+                <div class="list-item" style="border-bottom:none;" onclick="openChannelModal('ntfy', 'Ntfy', [{key:'server_url',label:'Server URL',value:'{{ config.notification.channels.ntfy.server_url | default("https://ntfy.sh", true) }}'},{key:'topic',label:'Topic',value:'{{ config.notification.channels.ntfy.topic | default("", true) }}'}])">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-800">Ntfy</div>
+                        <div class="value-preview {% if not config.notification.channels.ntfy.topic %}empty{% endif %}">
+                            {% if config.notification.channels.ntfy.topic %}
+                            {{ config.notification.channels.ntfy.server_url }}/{{ config.notification.channels.ntfy.topic }}
+                            {% else %}
+                            未设置
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="text-primary text-sm">修改</span>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- 添加平台弹窗 -->
+<div id="platform-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800">添加热榜平台</h3>
+        </div>
+        <div class="p-5 space-y-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">平台 ID</label>
+                <input type="text" id="modal-platform-id" placeholder="weibo" class="channel-input">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">平台名称</label>
+                <input type="text" id="modal-platform-name" placeholder="微博热搜" class="channel-input">
+            </div>
+        </div>
+        <div class="px-5 py-4 bg-gray-50 flex gap-3">
+            <button onclick="closePlatformModal()" class="flex-1 py-2.5 text-gray-600 bg-white rounded-xl text-sm font-medium shadow-sm">取消</button>
+            <button onclick="addPlatform()" class="flex-1 py-2.5 bg-primary text-white rounded-xl text-sm font-medium">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加 RSS 弹窗 -->
+<div id="rss-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-semibold text-gray-800">添加 RSS 订阅源</h3>
+        </div>
+        <div class="p-5 space-y-4">
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">源 ID</label>
+                <input type="text" id="modal-rss-id" placeholder="sspai" class="channel-input">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">名称</label>
+                <input type="text" id="modal-rss-name" placeholder="少数派" class="channel-input">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">RSS URL</label>
+                <input type="text" id="modal-rss-url" placeholder="https://sspai.com/feed" class="channel-input">
+            </div>
+        </div>
+        <div class="px-5 py-4 bg-gray-50 flex gap-3">
+            <button onclick="closeRssModal()" class="flex-1 py-2.5 text-gray-600 bg-white rounded-xl text-sm font-medium shadow-sm">取消</button>
+            <button onclick="addRssFeed()" class="flex-1 py-2.5 bg-primary text-white rounded-xl text-sm font-medium">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 通知渠道编辑弹窗 -->
+<div id="channel-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 id="channel-modal-title" class="text-lg font-semibold text-gray-800">编辑通知渠道</h3>
+        </div>
+        <div id="channel-modal-fields" class="p-5 space-y-4">
+            <!-- 动态生成的输入框 -->
+        </div>
+        <div class="px-5 py-4 bg-gray-50 flex gap-3">
+            <button onclick="closeChannelModal()" class="flex-1 py-2.5 text-gray-600 bg-white rounded-xl text-sm font-medium shadow-sm">取消</button>
+            <button onclick="saveChannel()" class="flex-1 py-2.5 bg-primary text-white rounded-xl text-sm font-medium">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div id="confirm-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs overflow-hidden">
+        <div class="p-5 text-center">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </div>
+            <p id="confirm-message" class="text-sm text-gray-600"></p>
+        </div>
+        <div class="px-5 py-4 bg-gray-50 flex gap-3">
+            <button onclick="closeConfirmModal()" class="flex-1 py-2.5 text-gray-600 bg-white rounded-xl text-sm font-medium shadow-sm">取消</button>
+            <button id="confirm-btn" class="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium">删除</button>
         </div>
     </div>
 </div>
@@ -159,20 +366,40 @@
 
 {% block scripts %}
 <script>
-    // 重置配置
-    function resetConfig() {
-        location.reload();
+    // Toast
+    function showToast(message, isError = false) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        toastMessage.textContent = message;
+        toast.className = toast.className.replace(/bg-gray-800|bg-red-500/g, isError ? 'bg-red-500' : 'bg-gray-800');
+        toast.classList.remove('-translate-y-20');
+        toast.classList.add('translate-y-0');
+        setTimeout(() => {
+            toast.classList.remove('translate-y-0');
+            toast.classList.add('-translate-y-20');
+        }, 2000);
     }
 
-    // 添加平台
+    // 平台管理
+    function openPlatformModal() {
+        document.getElementById('modal-platform-id').value = '';
+        document.getElementById('modal-platform-name').value = '';
+        const modal = document.getElementById('platform-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => document.getElementById('modal-platform-id').focus(), 100);
+    }
+
+    function closePlatformModal() {
+        const modal = document.getElementById('platform-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
     async function addPlatform() {
-        const id = document.getElementById('new-platform-id').value.trim();
-        const name = document.getElementById('new-platform-name').value.trim();
-        
-        if (!id || !name) {
-            showToast('请填写完整信息');
-            return;
-        }
+        const id = document.getElementById('modal-platform-id').value.trim();
+        const name = document.getElementById('modal-platform-name').value.trim();
+        if (!id || !name) { showToast('请填写完整信息', true); return; }
         
         try {
             const resp = await fetch('/config/platforms', {
@@ -181,47 +408,69 @@
                 body: JSON.stringify({ id, name, enabled: true })
             });
             const data = await resp.json();
-            
             if (resp.ok) {
-                showToast(data.message);
+                showToast('添加成功');
+                closePlatformModal();
                 location.reload();
             } else {
-                showToast(data.detail || '添加失败');
+                showToast(data.detail || '添加失败', true);
             }
-        } catch (e) {
-            showToast('请求失败');
-        }
+        } catch (e) { showToast('请求失败', true); }
     }
 
-    // 删除平台
-    async function deletePlatform(id) {
-        if (!confirm('确定要删除该平台吗？')) return;
-        
+    async function togglePlatform(id, enabled) {
         try {
-            const resp = await fetch(`/config/platforms/${id}`, { method: 'DELETE' });
-            const data = await resp.json();
-            
+            const resp = await fetch(`/config/platforms/${id}/toggle`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            });
             if (resp.ok) {
-                showToast(data.message);
-                location.reload();
+                showToast(enabled ? '已启用' : '已关闭');
             } else {
-                showToast(data.detail || '删除失败');
+                document.getElementById(`platform-${id}`).checked = !enabled;
+                showToast('操作失败', true);
             }
         } catch (e) {
-            showToast('请求失败');
+            document.getElementById(`platform-${id}`).checked = !enabled;
+            showToast('请求失败', true);
         }
     }
 
-    // 添加 RSS 源
+    function deletePlatform(id, name) {
+        showConfirmModal(`确定删除「${name}」？`, async () => {
+            try {
+                const resp = await fetch(`/config/platforms/${id}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    showToast('已删除');
+                    location.reload();
+                } else { showToast('删除失败', true); }
+            } catch (e) { showToast('请求失败', true); }
+        });
+    }
+
+    // RSS 管理
+    function openRssModal() {
+        document.getElementById('modal-rss-id').value = '';
+        document.getElementById('modal-rss-name').value = '';
+        document.getElementById('modal-rss-url').value = '';
+        const modal = document.getElementById('rss-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => document.getElementById('modal-rss-id').focus(), 100);
+    }
+
+    function closeRssModal() {
+        const modal = document.getElementById('rss-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
     async function addRssFeed() {
-        const id = document.getElementById('new-rss-id').value.trim();
-        const name = document.getElementById('new-rss-name').value.trim();
-        const url = document.getElementById('new-rss-url').value.trim();
-        
-        if (!id || !name || !url) {
-            showToast('请填写完整信息');
-            return;
-        }
+        const id = document.getElementById('modal-rss-id').value.trim();
+        const name = document.getElementById('modal-rss-name').value.trim();
+        const url = document.getElementById('modal-rss-url').value.trim();
+        if (!id || !name || !url) { showToast('请填写完整信息', true); return; }
         
         try {
             const resp = await fetch('/config/rss/feeds', {
@@ -230,84 +479,190 @@
                 body: JSON.stringify({ id, name, url, enabled: true })
             });
             const data = await resp.json();
-            
             if (resp.ok) {
-                showToast(data.message);
+                showToast('添加成功');
+                closeRssModal();
                 location.reload();
             } else {
-                showToast(data.detail || '添加失败');
+                showToast(data.detail || '添加失败', true);
             }
-        } catch (e) {
-            showToast('请求失败');
-        }
+        } catch (e) { showToast('请求失败', true); }
     }
 
-    // 删除 RSS 源
-    async function deleteRssFeed(id) {
-        if (!confirm('确定要删除该订阅源吗？')) return;
-        
+    async function toggleRssFeed(id, enabled) {
         try {
-            const resp = await fetch(`/config/rss/feeds/${id}`, { method: 'DELETE' });
-            const data = await resp.json();
-            
-            if (resp.ok) {
-                showToast(data.message);
-                location.reload();
-            } else {
-                showToast(data.detail || '删除失败');
-            }
-        } catch (e) {
-            showToast('请求失败');
-        }
-    }
-
-    // 切换 RSS 开关
-    async function toggleRss() {
-        const enabled = document.getElementById('rss-enabled').checked;
-        await updateConfigItem('rss.enabled', enabled);
-    }
-
-    // 切换通知开关
-    async function toggleNotification() {
-        const enabled = document.getElementById('notification-enabled').checked;
-        await updateConfigItem('notification.enabled', enabled);
-    }
-
-    // 更新通知渠道
-    async function updateChannel(channel, key, value) {
-        try {
-            const resp = await fetch('/config/notification/channel', {
+            const resp = await fetch(`/config/rss/feeds/${id}/toggle`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    channel, 
-                    config: { [key]: value }
-                })
+                body: JSON.stringify({ enabled })
             });
-            
             if (resp.ok) {
-                showToast('已保存');
+                showToast(enabled ? '已启用' : '已关闭');
+            } else {
+                document.getElementById(`rss-${id}`).checked = !enabled;
+                showToast('操作失败', true);
             }
         } catch (e) {
-            showToast('保存失败');
+            document.getElementById(`rss-${id}`).checked = !enabled;
+            showToast('请求失败', true);
         }
     }
 
-    // 更新配置项
-    async function updateConfigItem(key, value) {
+    function deleteRssFeed(id, name) {
+        showConfirmModal(`确定删除「${name}」？`, async () => {
+            try {
+                const resp = await fetch(`/config/rss/feeds/${id}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    showToast('已删除');
+                    location.reload();
+                } else { showToast('删除失败', true); }
+            } catch (e) { showToast('请求失败', true); }
+        });
+    }
+
+    async function toggleRss(enabled) {
         try {
             const resp = await fetch('/config/item', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key, value })
+                body: JSON.stringify({ key: 'rss.enabled', value: enabled })
             });
-            
             if (resp.ok) {
-                showToast('已保存');
+                showToast(enabled ? 'RSS 已启用' : 'RSS 已关闭');
+            } else {
+                document.getElementById('rss-enabled').checked = !enabled;
+                showToast('操作失败', true);
             }
         } catch (e) {
-            showToast('保存失败');
+            document.getElementById('rss-enabled').checked = !enabled;
+            showToast('请求失败', true);
         }
     }
+
+    // 通知管理
+    async function toggleNotification(enabled) {
+        try {
+            const resp = await fetch('/config/item', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: 'notification.enabled', value: enabled })
+            });
+            if (resp.ok) {
+                showToast(enabled ? '通知已启用' : '通知已关闭');
+            } else {
+                document.getElementById('notification-enabled').checked = !enabled;
+                showToast('操作失败', true);
+            }
+        } catch (e) {
+            document.getElementById('notification-enabled').checked = !enabled;
+            showToast('请求失败', true);
+        }
+    }
+
+    // 通知渠道弹窗
+    let currentChannel = null;
+    let currentFields = [];
+
+    function openChannelModal(channel, title, fields) {
+        currentChannel = channel;
+        currentFields = fields;
+        
+        document.getElementById('channel-modal-title').textContent = `编辑 ${title}`;
+        
+        const container = document.getElementById('channel-modal-fields');
+        container.innerHTML = fields.map((f, i) => `
+            <div>
+                <label class="block text-sm text-gray-600 mb-1.5">${f.label}</label>
+                <input type="text" id="channel-field-${i}" value="${f.value}" placeholder="${f.label}" class="channel-input">
+            </div>
+        `).join('');
+        
+        const modal = document.getElementById('channel-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        
+        setTimeout(() => {
+            const firstInput = document.getElementById('channel-field-0');
+            if (firstInput) firstInput.focus();
+        }, 100);
+    }
+
+    function closeChannelModal() {
+        const modal = document.getElementById('channel-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        currentChannel = null;
+        currentFields = [];
+    }
+
+    async function saveChannel() {
+        if (!currentChannel || !currentFields.length) return;
+        
+        const config = {};
+        currentFields.forEach((f, i) => {
+            const input = document.getElementById(`channel-field-${i}`);
+            config[f.key] = input ? input.value.trim() : '';
+        });
+        
+        try {
+            const resp = await fetch('/config/notification/channel', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel: currentChannel, config, enabled: false })
+            });
+            if (resp.ok) {
+                showToast('已保存');
+                closeChannelModal();
+                location.reload();
+            } else {
+                showToast('保存失败', true);
+            }
+        } catch (e) {
+            showToast('保存失败', true);
+        }
+    }
+
+    // 确认弹窗
+    let confirmCallback = null;
+
+    function showConfirmModal(message, callback) {
+        document.getElementById('confirm-message').textContent = message;
+        confirmCallback = callback;
+        const modal = document.getElementById('confirm-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeConfirmModal() {
+        const modal = document.getElementById('confirm-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        confirmCallback = null;
+    }
+
+    document.getElementById('confirm-btn').onclick = () => {
+        if (confirmCallback) confirmCallback();
+        closeConfirmModal();
+    };
+
+    // 点击遮罩关闭
+    ['platform-modal', 'rss-modal', 'channel-modal', 'confirm-modal'].forEach(id => {
+        document.getElementById(id).onclick = (e) => {
+            if (e.target.id === id) {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById(id).classList.remove('flex');
+            }
+        };
+    });
+
+    // ESC 关闭
+    document.onkeydown = (e) => {
+        if (e.key === 'Escape') {
+            closePlatformModal();
+            closeRssModal();
+            closeChannelModal();
+            closeConfirmModal();
+        }
+    };
 </script>
 {% endblock %}

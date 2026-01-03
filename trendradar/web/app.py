@@ -1,5 +1,7 @@
 """
 TrendRadar FastAPI 应用主模块
+
+Web 界面专为移动端优化，配置存储在数据库中
 """
 
 import os
@@ -36,7 +38,8 @@ def get_config_manager():
     global config_manager
     if config_manager is None:
         from trendradar.web.config_manager import ConfigManager
-        config_manager = ConfigManager()
+        db_path = os.environ.get('TRENDRADAR_DB_PATH', 'data/trendradar.db')
+        config_manager = ConfigManager(db_path)
     return config_manager
 
 
@@ -49,22 +52,22 @@ async def lifespan(app: FastAPI):
     db = Database(db_path)
     
     from trendradar.web.config_manager import ConfigManager
-    config_manager = ConfigManager()
+    config_manager = ConfigManager(db_path)
     
-    print(f"✓ 数据库已连接: {db_path}")
-    print(f"✓ 配置已加载")
+    print(f"[Web] 数据库已连接: {db_path}")
+    print(f"[Web] 配置已从数据库加载")
     
     yield
     
     # 关闭时清理
-    print("Web 服务已停止")
+    print("[Web] 服务已停止")
 
 
 # 创建 FastAPI 应用
 app = FastAPI(
     title="TrendRadar",
-    description="热点新闻聚合与分析工具",
-    version="5.0.0",
+    description="热点新闻聚合与分析工具 - 移动端优化版",
+    version="5.1.0",
     lifespan=lifespan
 )
 

@@ -1,6 +1,6 @@
 [project]
 name = "trendradar"
-version = "5.0.0"
+version = "5.1.0"
 description = "TrendRadar - 热点新闻聚合与分析工具 (Web版)"
 requires-python = ">=3.10"
 dependencies = [
@@ -10,7 +10,6 @@ dependencies = [
     "fastmcp>=2.12.0,<2.14.0",
     "websockets>=13.0,<14.0",
     "feedparser>=6.0.0,<7.0.0",
-    "boto3>=1.35.0,<2.0.0",
     "fastapi>=0.115.0,<1.0.0",
     "uvicorn>=0.32.0,<1.0.0",
     "jinja2>=3.1.0,<4.0.0",

@@ -7,9 +7,7 @@
 
 from datetime import datetime
 from typing import List, Optional, Union
-import os
 import json
-import yaml
 import ast
 
 from .errors import InvalidParameterError
@@ -150,28 +148,27 @@ def _parse_string_to_bool(value: str) -> bool:
 
 def get_supported_platforms() -> List[str]:
     """
-    从 config.yaml 动态获取支持的平台列表
+    从数据库动态获取支持的平台列表
 
     Returns:
         平台ID列表
 
     Note:
         - 读取失败时返回空列表，允许所有平台通过（降级策略）
-        - 平台列表来自 config/config.yaml 中的 platforms 配置
+        - 平台列表来自数据库 platforms 表中的活跃平台
     """
     try:
-        # 获取 config.yaml 路径（相对于当前文件）
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(current_dir, "..", "..", "config", "config.yaml")
-        config_path = os.path.normpath(config_path)
-
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-            platforms = config.get('platforms', [])
-            return [p['id'] for p in platforms if 'id' in p]
+        from trendradar.storage.database import Database, DEFAULT_DB_PATH
+        
+        db = Database.get_instance(DEFAULT_DB_PATH)
+        result = db.execute("""
+            SELECT id FROM platforms 
+            WHERE type = 'hotlist' AND is_active = 1
+        """)
+        return [r['id'] for r in result]
     except Exception as e:
         # 降级方案：返回空列表，允许所有平台
-        print(f"警告：无法加载平台配置 ({config_path}): {e}")
+        print(f"警告：无法加载平台配置: {e}")
         return []
 
 
@@ -180,7 +177,7 @@ def validate_platforms(platforms: Optional[Union[List[str], str]]) -> List[str]:
     验证平台列表
 
     Args:
-        platforms: 平台ID列表或字符串，None表示使用 config.yaml 中配置的所有平台
+        platforms: 平台ID列表或字符串，None表示使用数据库中配置的所有平台
                    支持多种格式：
                    - None: 使用默认平台
                    - ["zhihu", "weibo"]: JSON 数组
@@ -196,14 +193,14 @@ def validate_platforms(platforms: Optional[Union[List[str], str]]) -> List[str]:
         InvalidParameterError: 平台不支持
 
     Note:
-        - platforms=None 时，返回 config.yaml 中配置的平台列表
-        - 会验证平台ID是否在 config.yaml 的 platforms 配置中
+        - platforms=None 时，返回数据库中配置的平台列表
+        - 会验证平台ID是否在数据库的 platforms 表中
         - 配置加载失败时，允许所有平台通过（降级策略）
     """
     supported_platforms = get_supported_platforms()
 
     if platforms is None:
-        # 返回配置文件中的平台列表（用户的默认配置）
+        # 返回数据库中的平台列表（用户的默认配置）
         return supported_platforms if supported_platforms else []
 
     # 支持字符串形式的列表输入（某些 MCP 客户端会将 JSON 数组序列化为字符串）
@@ -217,7 +214,7 @@ def validate_platforms(platforms: Optional[Union[List[str], str]]) -> List[str]:
         raise InvalidParameterError("platforms 参数必须是列表类型")
 
     if not platforms:
-        # 空列表时，返回配置文件中的平台列表
+        # 空列表时，返回数据库中的平台列表
         return supported_platforms if supported_platforms else []
 
     # 如果配置加载失败（supported_platforms为空），允许所有平台通过
@@ -230,7 +227,7 @@ def validate_platforms(platforms: Optional[Union[List[str], str]]) -> List[str]:
     if invalid_platforms:
         raise InvalidParameterError(
             f"不支持的平台: {', '.join(invalid_platforms)}",
-            suggestion=f"支持的平台（来自config.yaml）: {', '.join(supported_platforms)}"
+            suggestion=f"支持的平台（来自数据库）: {', '.join(supported_platforms)}"
         )
 
     return platforms

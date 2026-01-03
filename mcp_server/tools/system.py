@@ -88,34 +88,30 @@ class SystemManagementTools:
         """
         try:
             import time
-            import yaml
             from trendradar.crawler.fetcher import DataFetcher
             from trendradar.storage.local import LocalStorageBackend
             from trendradar.storage.base import convert_crawl_results_to_news_data
+            from trendradar.storage.database import Database, DEFAULT_DB_PATH
             from trendradar.utils.time import get_configured_time, format_date_folder, format_time_filename
             from ..services.cache_service import get_cache
 
             # 参数验证
             platforms = validate_platforms(platforms)
 
-            # 加载配置文件
-            config_path = self.project_root / "config" / "config.yaml"
-            if not config_path.exists():
-                raise CrawlTaskError(
-                    "配置文件不存在",
-                    suggestion=f"请确保配置文件存在: {config_path}"
-                )
-
-            # 读取配置
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
-
+            # 从数据库读取配置
+            db = Database.get_instance(DEFAULT_DB_PATH)
+            
             # 获取平台配置
-            all_platforms = config_data.get("platforms", [])
+            all_platforms_result = db.execute("""
+                SELECT id, name FROM platforms 
+                WHERE type = 'hotlist' AND is_active = 1
+            """)
+            all_platforms = [{'id': r['id'], 'name': r['name']} for r in all_platforms_result]
+            
             if not all_platforms:
                 raise CrawlTaskError(
-                    "配置文件中没有平台配置",
-                    suggestion="请检查 config/config.yaml 中的 platforms 配置"
+                    "数据库中没有平台配置",
+                    suggestion="请在设置页面添加平台配置"
                 )
 
             # 过滤平台
@@ -139,15 +135,24 @@ class SystemManagementTools:
 
             print(f"开始临时爬取，平台: {[p.get('name', p['id']) for p in target_platforms]}")
 
-            # 初始化数据获取器
-            advanced = config_data.get("advanced", {})
-            crawler_config = advanced.get("crawler", {})
-            proxy_url = None
-            if crawler_config.get("use_proxy"):
-                proxy_url = crawler_config.get("default_proxy")
+            # 从数据库读取爬虫配置
+            def get_config(key, default):
+                result = db.execute("SELECT value FROM app_config WHERE key = ?", (key,))
+                if result:
+                    import json
+                    try:
+                        return json.loads(result[0]['value'])
+                    except:
+                        return result[0]['value']
+                return default
+            
+            use_proxy = get_config("advanced.crawler.use_proxy", False)
+            proxy_url = get_config("advanced.crawler.default_proxy", "") if use_proxy else None
+            request_interval = get_config("advanced.crawler.request_interval", 1000)
+            timezone = get_config("app.timezone", "Asia/Shanghai")
+            data_dir = get_config("storage.data_dir", "data")
             
             fetcher = DataFetcher(proxy_url=proxy_url)
-            request_interval = crawler_config.get("request_interval", 100)
 
             # 执行爬取
             results, id_to_name, failed_ids = fetcher.crawl_websites(
@@ -156,8 +161,6 @@ class SystemManagementTools:
             )
 
             # 获取当前时间（统一使用 trendradar 的时间工具）
-            # 从配置中读取时区，默认为 Asia/Shanghai
-            timezone = config_data.get("app", {}).get("timezone", "Asia/Shanghai")
             current_time = get_configured_time(timezone)
             crawl_date = format_date_folder(None, timezone)
             crawl_time_str = format_time_filename(timezone)
@@ -173,7 +176,7 @@ class SystemManagementTools:
 
             # 初始化存储后端
             storage = LocalStorageBackend(
-                data_dir=str(self.project_root / "output"),
+                data_dir=str(self.project_root / data_dir),
                 enable_txt=True,
                 enable_html=True,
                 timezone=timezone

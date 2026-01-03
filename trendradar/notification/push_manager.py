@@ -3,7 +3,7 @@
 推送记录管理模块
 
 管理推送记录，支持每日只推送一次和时间窗口控制
-通过 storage_backend 统一存储，支持本地 SQLite 和远程云存储
+通过 storage_backend 统一存储（本地 SQLite）
 """
 
 from datetime import datetime
@@ -17,10 +17,9 @@ class PushRecordManager:
     推送记录管理器
 
     通过 storage_backend 统一管理推送记录：
-    - 本地环境：使用 LocalStorageBackend，数据存储在本地 SQLite
-    - GitHub Actions：使用 RemoteStorageBackend，数据存储在云端
+    - 使用 LocalStorageBackend，数据存储在本地 SQLite
 
-    这样 once_per_day 功能在 GitHub Actions 上也能正常工作。
+    支持 once_per_day 功能，确保每天只推送一次。
     """
 
     def __init__(
@@ -32,7 +31,7 @@ class PushRecordManager:
         初始化推送记录管理器
 
         Args:
-            storage_backend: 存储后端实例（LocalStorageBackend 或 RemoteStorageBackend）
+            storage_backend: 存储后端实例（LocalStorageBackend）
             get_time_func: 获取当前时间的函数（应使用配置的时区）
         """
         self.storage_backend = storage_backend

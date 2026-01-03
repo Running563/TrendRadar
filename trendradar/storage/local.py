@@ -34,8 +34,8 @@ class LocalStorageBackend(StorageBackend):
 
     def __init__(
         self,
-        data_dir: str = "output",
-        enable_txt: bool = True,
+        data_dir: str = "data",
+        enable_txt: bool = False,
         enable_html: bool = True,
         timezone: str = "Asia/Shanghai",
     ):

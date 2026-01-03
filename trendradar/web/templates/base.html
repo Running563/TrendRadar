@@ -2,7 +2,11 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="theme-color" content="#3b82f6">
     <title>{{ page_title | default('TrendRadar') }} - TrendRadar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -18,20 +22,49 @@
         }
     </script>
     <style>
+        /* 移动端优化样式 */
+        html {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-text-size-adjust: 100%;
+        }
+        body {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+        }
+        /* 安全区域适配 */
+        .safe-area-inset-top { padding-top: env(safe-area-inset-top); }
+        .safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        /* 加载动画 */
         .loading { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        /* 触摸反馈 */
+        .touch-feedback:active {
+            opacity: 0.7;
+            transform: scale(0.98);
+        }
+        /* 移动端滚动优化 */
+        .scroll-container {
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        /* 隐藏滚动条但保持滚动功能 */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* 底部导航栏高度占位 */
+        .bottom-nav-spacer { height: calc(56px + env(safe-area-inset-bottom)); }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- 导航栏 -->
-    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-14">
+<body class="bg-gray-50 min-h-screen pb-14 md:pb-0">
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-50 safe-area-inset-top">
+        <div class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+            <div class="flex justify-between h-12 sm:h-14">
                 <div class="flex items-center">
-                    <a href="/" class="flex items-center space-x-2">
-                        <span class="text-xl font-bold text-primary">TrendRadar</span>
+                    <a href="/" class="flex items-center">
+                        <span class="text-lg sm:text-xl font-bold text-primary">TrendRadar</span>
                     </a>
-                    <div class="hidden sm:ml-8 sm:flex sm:space-x-4">
+                    <!-- 桌面端导航 -->
+                    <div class="hidden md:ml-8 md:flex md:space-x-4">
                         <a href="/" class="px-3 py-2 text-sm font-medium {% if request.url.path == '/' %}text-primary border-b-2 border-primary{% else %}text-gray-600 hover:text-primary{% endif %}">
                             热点概览
                         </a>
@@ -46,38 +79,60 @@
                         </a>
                     </div>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <button onclick="triggerCrawl()" id="crawl-btn" class="px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-blue-600 transition">
+                <div class="flex items-center">
+                    <button onclick="triggerCrawl()" id="crawl-btn" class="px-3 py-1.5 text-xs sm:text-sm bg-primary text-white rounded-lg hover:bg-blue-600 transition touch-feedback">
                         抓取数据
                     </button>
                 </div>
             </div>
         </div>
-        <!-- 移动端导航 -->
-        <div class="sm:hidden border-t">
-            <div class="flex justify-around py-2">
-                <a href="/" class="text-sm {% if request.url.path == '/' %}text-primary{% else %}text-gray-600{% endif %}">概览</a>
-                <a href="/news" class="text-sm {% if '/news' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">新闻</a>
-                <a href="/rss" class="text-sm {% if '/rss' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">RSS</a>
-                <a href="/settings" class="text-sm {% if '/settings' in request.url.path %}text-primary{% else %}text-gray-600{% endif %}">设置</a>
-            </div>
-        </div>
     </nav>
 
     <!-- 主内容区 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <main class="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 scroll-container">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- 页脚 -->
-    <footer class="bg-white border-t mt-8">
+    <!-- 移动端底部导航栏 -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 safe-area-inset-bottom">
+        <div class="flex justify-around py-2">
+            <a href="/" class="flex flex-col items-center px-3 py-1 touch-feedback {% if request.url.path == '/' %}text-primary{% else %}text-gray-500{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+                <span class="text-xs mt-0.5">概览</span>
+            </a>
+            <a href="/news" class="flex flex-col items-center px-3 py-1 touch-feedback {% if '/news' in request.url.path %}text-primary{% else %}text-gray-500{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path>
+                </svg>
+                <span class="text-xs mt-0.5">新闻</span>
+            </a>
+            <a href="/rss" class="flex flex-col items-center px-3 py-1 touch-feedback {% if '/rss' in request.url.path %}text-primary{% else %}text-gray-500{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"></path>
+                </svg>
+                <span class="text-xs mt-0.5">RSS</span>
+            </a>
+            <a href="/settings" class="flex flex-col items-center px-3 py-1 touch-feedback {% if '/settings' in request.url.path %}text-primary{% else %}text-gray-500{% endif %}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <span class="text-xs mt-0.5">设置</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- 桌面端页脚 -->
+    <footer class="hidden md:block bg-white border-t mt-8">
         <div class="max-w-7xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
-            TrendRadar v5.0.0 - 热点新闻聚合与分析工具
+            TrendRadar v5.1.0 - 热点新闻聚合与分析工具
         </div>
     </footer>
 
     <!-- 全局提示 -->
-    <div id="toast" class="fixed bottom-4 right-4 hidden">
+    <div id="toast" class="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 hidden z-50">
         <div class="bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm"></div>
     </div>
 
@@ -142,6 +197,37 @@
             };
             
             check();
+        }
+
+        // 移动端优化：禁止双击缩放（排除输入框和文本域）
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function(e) {
+            const now = Date.now();
+            // 排除输入框、文本域、可编辑元素
+            const tag = e.target.tagName.toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
+                return;
+            }
+            // 防止双击缩放
+            if (now - lastTouchEnd < 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
+
+        // 移动端优化：处理返回手势
+        if ('ontouchstart' in window) {
+            let startX = 0;
+            document.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+            });
+            document.addEventListener('touchend', (e) => {
+                const endX = e.changedTouches[0].clientX;
+                const diff = endX - startX;
+                if (startX < 30 && diff > 80) {
+                    history.back();
+                }
+            });
         }
     </script>
     {% block scripts %}{% endblock %}

@@ -341,34 +341,6 @@ class ParserService:
             suggestion="请先运行爬虫或检查日期是否正确"
         )
 
-    def parse_yaml_config(self, config_path: str = None) -> dict:
-        """
-        解析YAML配置文件
-
-        Args:
-            config_path: 配置文件路径，默认为 config/config.yaml
-
-        Returns:
-            配置字典
-
-        Raises:
-            FileParseError: 配置文件解析错误
-        """
-        if config_path is None:
-            config_path = self.project_root / "config" / "config.yaml"
-        else:
-            config_path = Path(config_path)
-
-        if not config_path.exists():
-            raise FileParseError(str(config_path), "配置文件不存在")
-
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
-            return config_data
-        except Exception as e:
-            raise FileParseError(str(config_path), str(e))
-
     def parse_frequency_words(self, words_file: str = None) -> List[Dict]:
         """
         解析关键词配置文件
