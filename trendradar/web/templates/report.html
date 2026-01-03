@@ -1,0 +1,542 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* 选择器样式 */
+    .selector-group {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 2px 0;
+        -webkit-overflow-scrolling: touch;
+    }
+    .selector-group::-webkit-scrollbar { display: none; }
+    
+    .selector-btn {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        white-space: nowrap;
+        background: white;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
+        transition: all 0.2s;
+        touch-action: manipulation;
+    }
+    .selector-btn.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    
+    /* 时间选择器 */
+    .time-selector {
+        display: flex;
+        gap: 6px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 4px 0;
+    }
+    .time-btn {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        background: #f3f4f6;
+        color: #6b7280;
+        transition: all 0.2s;
+    }
+    .time-btn.active {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    
+    /* 平台卡片 */
+    .platform-card {
+        background: white;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    .platform-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .platform-name {
+        font-weight: 600;
+        color: #1f2937;
+        font-size: 15px;
+    }
+    .platform-count {
+        font-size: 12px;
+        color: #9ca3af;
+    }
+    
+    /* 新闻列表 */
+    .news-list {
+        padding: 0;
+    }
+    .news-item {
+        display: flex;
+        padding: 12px 16px;
+        border-bottom: 1px solid #f9fafb;
+        gap: 12px;
+        text-decoration: none;
+        transition: background 0.15s;
+    }
+    .news-item:last-child {
+        border-bottom: none;
+    }
+    .news-item:active {
+        background: #f9fafb;
+    }
+    .news-rank {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .news-rank.top1 { background: #fef3c7; color: #d97706; }
+    .news-rank.top2 { background: #e5e7eb; color: #6b7280; }
+    .news-rank.top3 { background: #fed7aa; color: #c2410c; }
+    .news-rank.normal { background: #f3f4f6; color: #9ca3af; }
+    
+    .news-title {
+        flex: 1;
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .news-item.new .news-title::before {
+        content: 'NEW';
+        display: inline-block;
+        padding: 1px 4px;
+        margin-right: 6px;
+        border-radius: 3px;
+        font-size: 10px;
+        font-weight: 600;
+        background: #fee2e2;
+        color: #dc2626;
+    }
+    
+    /* 加载状态 */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+    }
+    .loading-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* 空状态 */
+    .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: #9ca3af;
+    }
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        opacity: 0.5;
+    }
+    
+    /* 统计栏 */
+    .stats-bar {
+        display: flex;
+        gap: 16px;
+        padding: 12px 16px;
+        background: white;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .stat-item {
+        text-align: center;
+    }
+    .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    .stat-label {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    
+    /* 开关 */
+    .toggle-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .toggle-label {
+        font-size: 13px;
+        color: #6b7280;
+    }
+    .toggle-switch {
+        position: relative;
+        width: 36px;
+        height: 20px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #d1d5db;
+        transition: .2s;
+        border-radius: 20px;
+    }
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .2s;
+        border-radius: 50%;
+    }
+    input:checked + .toggle-slider {
+        background-color: #3b82f6;
+    }
+    input:checked + .toggle-slider:before {
+        transform: translateX(16px);
+    }
+</style>
+
+<div class="max-w-3xl mx-auto pb-4">
+    <!-- 顶部控制区 -->
+    <div class="mb-4">
+        <!-- 模式选择 -->
+        <div class="mb-3">
+            <div class="text-xs text-gray-500 mb-2">报告模式</div>
+            <div class="selector-group">
+                <button class="selector-btn {% if current_mode == 'daily' %}active{% endif %}" data-mode="daily">
+                    当日汇总
+                </button>
+                <button class="selector-btn {% if current_mode == 'current' or not current_mode %}active{% endif %}" data-mode="current">
+                    当前榜单
+                </button>
+                <button class="selector-btn {% if current_mode == 'incremental' %}active{% endif %}" data-mode="incremental">
+                    增量监控
+                </button>
+            </div>
+        </div>
+        
+        <!-- 日期选择 -->
+        <div class="mb-3">
+            <div class="text-xs text-gray-500 mb-2">选择日期</div>
+            <div class="selector-group" id="date-selector">
+                {% for d in available_dates[:7] %}
+                <button class="selector-btn {% if d == current_date or (not current_date and loop.first) %}active{% endif %}" data-date="{{ d }}">
+                    {{ d[5:] }}
+                </button>
+                {% else %}
+                <span class="text-gray-400 text-sm">暂无数据</span>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- 时间选择（非当日汇总模式显示） -->
+        <div id="time-selector-wrapper" class="mb-3" style="display: none;">
+            <div class="text-xs text-gray-500 mb-2">选择时间点</div>
+            <div class="time-selector" id="time-selector">
+                <span class="text-gray-400 text-sm">加载中...</span>
+            </div>
+        </div>
+        
+        <!-- 关键字过滤开关 -->
+        <div class="flex items-center justify-between bg-white rounded-lg px-4 py-3 shadow-sm">
+            <div class="toggle-wrapper">
+                <span class="toggle-label">应用关键字过滤</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="use-keywords" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <button onclick="loadReport()" class="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium">
+                刷新
+            </button>
+        </div>
+    </div>
+    
+    <!-- 统计信息 -->
+    <div class="stats-bar" id="stats-bar" style="display: none;">
+        <div class="stat-item flex-1">
+            <div class="stat-value" id="stat-platforms">0</div>
+            <div class="stat-label">平台数</div>
+        </div>
+        <div class="stat-item flex-1">
+            <div class="stat-value" id="stat-total">0</div>
+            <div class="stat-label">总条目</div>
+        </div>
+        <div class="stat-item flex-1">
+            <div class="stat-value" id="stat-filtered">0</div>
+            <div class="stat-label">匹配数</div>
+        </div>
+    </div>
+    
+    <!-- 报告内容区 -->
+    <div id="report-content">
+        <div class="empty-state">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <div>选择日期和模式后点击刷新</div>
+        </div>
+    </div>
+    
+    <!-- 加载遮罩 -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 当前状态
+    let currentMode = '{{ current_mode or "current" }}';
+    let currentDate = '{{ current_date or "" }}';
+    let currentTime = '{{ current_time or "" }}';
+    let availableTimes = [];
+    
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+        // 如果没有选中日期，选第一个
+        if (!currentDate) {
+            const firstDate = document.querySelector('#date-selector .selector-btn');
+            if (firstDate) {
+                currentDate = firstDate.dataset.date;
+                firstDate.classList.add('active');
+            }
+        }
+        
+        // 绑定模式选择
+        document.querySelectorAll('[data-mode]').forEach(btn => {
+            btn.onclick = () => selectMode(btn.dataset.mode);
+        });
+        
+        // 绑定日期选择
+        document.querySelectorAll('#date-selector [data-date]').forEach(btn => {
+            btn.onclick = () => selectDate(btn.dataset.date);
+        });
+        
+        // 初始加载
+        updateUI();
+        if (currentDate) {
+            loadTimes();
+        }
+    });
+    
+    // 选择模式
+    function selectMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('[data-mode]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+        updateUI();
+        if (currentMode !== 'daily' && currentDate) {
+            loadTimes();
+        } else {
+            loadReport();
+        }
+    }
+    
+    // 选择日期
+    function selectDate(date) {
+        currentDate = date;
+        currentTime = '';
+        document.querySelectorAll('#date-selector [data-date]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.date === date);
+        });
+        if (currentMode !== 'daily') {
+            loadTimes();
+        } else {
+            loadReport();
+        }
+    }
+    
+    // 选择时间
+    function selectTime(time) {
+        currentTime = time;
+        document.querySelectorAll('#time-selector [data-time]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.time === time);
+        });
+        loadReport();
+    }
+    
+    // 更新UI
+    function updateUI() {
+        const timeWrapper = document.getElementById('time-selector-wrapper');
+        if (currentMode === 'daily') {
+            timeWrapper.style.display = 'none';
+        } else {
+            timeWrapper.style.display = 'block';
+        }
+    }
+    
+    // 加载可用时间点
+    async function loadTimes() {
+        if (!currentDate) return;
+        
+        try {
+            const resp = await fetch(`/api/report/times?date=${currentDate}`);
+            const data = await resp.json();
+            availableTimes = data.times || [];
+            
+            const container = document.getElementById('time-selector');
+            if (availableTimes.length === 0) {
+                container.innerHTML = '<span class="text-gray-400 text-sm">该日期无数据</span>';
+                return;
+            }
+            
+            container.innerHTML = availableTimes.map((t, i) => {
+                const timeStr = t.slice(11, 16); // 取 HH:MM
+                const isActive = currentTime === t || (!currentTime && i === 0);
+                if (!currentTime && i === 0) currentTime = t;
+                return `<button class="time-btn ${isActive ? 'active' : ''}" data-time="${t}" onclick="selectTime('${t}')">${timeStr}</button>`;
+            }).join('');
+            
+            loadReport();
+        } catch (e) {
+            console.error('加载时间点失败:', e);
+        }
+    }
+    
+    // 加载报告数据
+    async function loadReport() {
+        if (!currentDate) return;
+        
+        const useKeywords = document.getElementById('use-keywords').checked;
+        
+        // 显示加载
+        document.getElementById('loading-overlay').style.display = 'flex';
+        
+        try {
+            let url = `/api/report/data?mode=${currentMode}&date=${currentDate}&use_keywords=${useKeywords}`;
+            if (currentMode !== 'daily' && currentTime) {
+                url += `&time=${encodeURIComponent(currentTime)}`;
+            }
+            
+            const resp = await fetch(url);
+            const data = await resp.json();
+            
+            renderReport(data);
+        } catch (e) {
+            console.error('加载报告失败:', e);
+            document.getElementById('report-content').innerHTML = `
+                <div class="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>加载失败，请重试</div>
+                </div>
+            `;
+        } finally {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+    }
+    
+    // 渲染报告
+    function renderReport(data) {
+        const container = document.getElementById('report-content');
+        const statsBar = document.getElementById('stats-bar');
+        
+        if (!data.platforms || data.platforms.length === 0) {
+            statsBar.style.display = 'none';
+            container.innerHTML = `
+                <div class="empty-state">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                    </svg>
+                    <div>${data.use_keywords ? '无匹配关键字的内容' : '该时间段暂无数据'}</div>
+                </div>
+            `;
+            return;
+        }
+        
+        // 更新统计
+        statsBar.style.display = 'flex';
+        document.getElementById('stat-platforms').textContent = data.platforms.length;
+        document.getElementById('stat-total').textContent = data.total_items;
+        document.getElementById('stat-filtered').textContent = data.filtered_items;
+        
+        // 渲染平台卡片
+        let html = '';
+        for (const platform of data.platforms) {
+            html += `
+                <div class="platform-card">
+                    <div class="platform-header">
+                        <span class="platform-name">${platform.name}</span>
+                        <span class="platform-count">${platform.filtered}/${platform.total}</span>
+                    </div>
+                    <div class="news-list">
+            `;
+            
+            for (const item of platform.items) {
+                const rankClass = item.rank === 1 ? 'top1' : item.rank === 2 ? 'top2' : item.rank === 3 ? 'top3' : 'normal';
+                const isNew = item.is_new ? 'new' : '';
+                
+                html += `
+                    <a href="${item.url}" target="_blank" class="news-item ${isNew}">
+                        <span class="news-rank ${rankClass}">${item.rank || '-'}</span>
+                        <span class="news-title">${escapeHtml(item.title)}</span>
+                    </a>
+                `;
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    // HTML转义
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

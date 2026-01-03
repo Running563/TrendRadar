@@ -4,6 +4,7 @@
 所有配置存储在数据库中，不支持直接修改配置文件
 """
 
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
@@ -43,6 +44,10 @@ class NotificationChannelConfig(BaseModel):
     channel: str
     config: Dict[str, Any]
     enabled: bool = False
+
+
+class KeywordsRequest(BaseModel):
+    content: str
 
 
 # ========== API 端点 ==========
@@ -329,3 +334,34 @@ async def save_config_form(request: Request):
             return RedirectResponse(url=f"/settings?error={str(e)}", status_code=303)
     
     return RedirectResponse(url="/settings", status_code=303)
+
+
+# ========== 关键字配置 ==========
+
+KEYWORDS_FILE = "config/frequency_words.txt"
+
+
+@router.get("/keywords")
+async def get_keywords():
+    """获取关键字配置"""
+    try:
+        keywords_path = Path(KEYWORDS_FILE)
+        if keywords_path.exists():
+            content = keywords_path.read_text(encoding="utf-8")
+        else:
+            content = ""
+        return {"content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取关键字配置失败: {e}")
+
+
+@router.put("/keywords")
+async def set_keywords(request: KeywordsRequest):
+    """更新关键字配置"""
+    try:
+        keywords_path = Path(KEYWORDS_FILE)
+        keywords_path.parent.mkdir(parents=True, exist_ok=True)
+        keywords_path.write_text(request.content, encoding="utf-8")
+        return {"success": True, "message": "关键字配置已保存"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存关键字配置失败: {e}")

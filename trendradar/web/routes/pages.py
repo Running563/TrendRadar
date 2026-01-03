@@ -176,9 +176,48 @@ async def settings_page(request: Request):
     """配置管理页面"""
     config = get_config_manager()
     
+    # 读取关键字配置
+    keywords_content = ""
+    keywords_path = Path("config/frequency_words.txt")
+    if keywords_path.exists():
+        keywords_content = keywords_path.read_text(encoding="utf-8")
+    
+    # 获取报告模式
+    report_mode = config.get("report.mode", "current")
+    
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "config": config.config,
         "config_raw": config.get_raw(),
+        "keywords_content": keywords_content,
+        "report_mode": report_mode,
         "page_title": "系统设置"
+    })
+
+
+@router.get("/report", response_class=HTMLResponse)
+async def report_page(
+    request: Request,
+    mode: str = Query(None, description="报告模式"),
+    date: str = Query(None, description="日期 YYYY-MM-DD"),
+    time: str = Query(None, description="具体时间点")
+):
+    """报告查看页面"""
+    db = get_db()
+    config = get_config_manager()
+    
+    # 获取可用日期
+    available_dates = db.get_available_dates()
+    
+    # 获取当前配置的报告模式（如果未指定）
+    if mode is None:
+        mode = config.get("report.mode", "current")
+    
+    return templates.TemplateResponse("report.html", {
+        "request": request,
+        "available_dates": available_dates,
+        "current_mode": mode,
+        "current_date": date,
+        "current_time": time,
+        "page_title": "报告查看"
     })

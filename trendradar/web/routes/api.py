@@ -3,11 +3,14 @@ API 路由 - RESTful API
 """
 
 import asyncio
+from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Query, HTTPException, BackgroundTasks
 from pydantic import BaseModel
+from pathlib import Path
 
 from trendradar.web.app import get_db, get_config_manager
+from trendradar.core.frequency import load_frequency_words, matches_word_groups
 
 router = APIRouter(tags=["api"])
 
@@ -336,3 +339,277 @@ async def trigger_crawl(
 async def get_crawl_status():
     """获取爬虫运行状态"""
     return _crawl_status
+
+
+# ========== 报告 API ==========
+
+@router.get("/report/times")
+async def get_report_times(date: Optional[str] = Query(None, description="日期 YYYY-MM-DD")):
+    """获取指定日期的抓取时间点列表"""
+    db = get_db()
+    
+    if date is None:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    # 查询该日期的所有抓取记录
+    records = db.execute("""
+        SELECT DISTINCT crawl_time 
+        FROM crawl_records 
+        WHERE DATE(crawl_time) = ?
+        ORDER BY crawl_time DESC
+    """, (date,))
+    
+    times = [r['crawl_time'] for r in records]
+    
+    return {
+        "date": date,
+        "times": times,
+        "count": len(times)
+    }
+
+
+@router.get("/report/data")
+async def get_report_data(
+    mode: str = Query("current", description="报告模式: daily/current/incremental"),
+    date: Optional[str] = Query(None, description="日期 YYYY-MM-DD"),
+    time: Optional[str] = Query(None, description="具体时间点"),
+    use_keywords: bool = Query(True, description="是否应用关键字过滤")
+):
+    """
+    获取报告数据
+    
+    - mode: 报告模式
+      - daily: 当日汇总，聚合指定日期所有数据
+      - current: 当前榜单，显示指定时间点的完整榜单
+      - incremental: 增量模式，显示指定时间点新增的内容
+    - date: 日期，默认今天
+    - time: 具体抓取时间点（仅 current/incremental 模式有效）
+    - use_keywords: 是否应用关键字过滤
+    """
+    db = get_db()
+    config = get_config_manager()
+    
+    if date is None:
+        date = datetime.now().strftime("%Y-%m-%d")
+    
+    # 加载关键字配置
+    word_groups = []
+    filter_words = []
+    global_filters = []
+    
+    if use_keywords:
+        try:
+            keywords_path = Path("config/frequency_words.txt")
+            if keywords_path.exists():
+                word_groups, filter_words, global_filters = load_frequency_words(str(keywords_path))
+        except Exception:
+            pass  # 如果加载失败，不使用关键字过滤
+    
+    # 获取平台信息
+    platforms = db.get_platforms(platform_type='hotlist')
+    platform_map = {p['id']: p['name'] for p in platforms}
+    
+    result = {
+        "mode": mode,
+        "date": date,
+        "time": time,
+        "use_keywords": use_keywords,
+        "platforms": [],
+        "total_items": 0,
+        "filtered_items": 0,
+        "generated_at": datetime.now().isoformat()
+    }
+    
+    if mode == "daily":
+        # 当日汇总：聚合该日期所有数据
+        for platform in platforms:
+            platform_id = platform['id']
+            
+            # 获取该平台该日期的所有新闻，按最高排名排序
+            news_items = db.execute("""
+                SELECT n.*, 
+                       MIN(rh.rank) as best_rank,
+                       COUNT(rh.id) as appear_count
+                FROM news_items n
+                LEFT JOIN rank_history rh ON n.id = rh.news_item_id
+                WHERE n.platform_id = ?
+                  AND DATE(n.first_crawl_time) = ?
+                GROUP BY n.id
+                ORDER BY best_rank ASC, appear_count DESC
+                LIMIT 50
+            """, (platform_id, date))
+            
+            filtered_news = []
+            for item in news_items:
+                # 应用关键字过滤
+                if use_keywords and word_groups:
+                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
+                        continue
+                
+                filtered_news.append({
+                    "id": item['id'],
+                    "title": item['title'],
+                    "url": item['url'],
+                    "rank": item['best_rank'] or item['rank'],
+                    "appear_count": item['appear_count'] or 1,
+                    "first_time": item['first_crawl_time'],
+                    "last_time": item['last_crawl_time']
+                })
+            
+            if filtered_news:
+                result["platforms"].append({
+                    "id": platform_id,
+                    "name": platform['name'],
+                    "items": filtered_news,
+                    "total": len(news_items),
+                    "filtered": len(filtered_news)
+                })
+                result["total_items"] += len(news_items)
+                result["filtered_items"] += len(filtered_news)
+    
+    elif mode == "current":
+        # 当前榜单：获取指定时间点的数据
+        if time:
+            # 使用指定时间点
+            crawl_time = time
+        else:
+            # 获取最新的抓取时间
+            latest = db.execute("""
+                SELECT crawl_time FROM crawl_records 
+                WHERE DATE(crawl_time) = ?
+                ORDER BY crawl_time DESC LIMIT 1
+            """, (date,))
+            crawl_time = latest[0]['crawl_time'] if latest else None
+        
+        if not crawl_time:
+            return result
+        
+        result["time"] = crawl_time
+        
+        for platform in platforms:
+            platform_id = platform['id']
+            
+            # 获取该时间点前后的数据（允许5分钟误差）
+            news_items = db.execute("""
+                SELECT DISTINCT n.*, rh.rank as current_rank
+                FROM news_items n
+                JOIN rank_history rh ON n.id = rh.news_item_id
+                WHERE n.platform_id = ?
+                  AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
+                ORDER BY rh.rank ASC
+                LIMIT 50
+            """, (platform_id, crawl_time))
+            
+            filtered_news = []
+            for item in news_items:
+                if use_keywords and word_groups:
+                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
+                        continue
+                
+                filtered_news.append({
+                    "id": item['id'],
+                    "title": item['title'],
+                    "url": item['url'],
+                    "rank": item['current_rank'] or item['rank'],
+                    "first_time": item['first_crawl_time'],
+                    "last_time": item['last_crawl_time']
+                })
+            
+            if filtered_news:
+                result["platforms"].append({
+                    "id": platform_id,
+                    "name": platform['name'],
+                    "items": filtered_news,
+                    "total": len(news_items),
+                    "filtered": len(filtered_news)
+                })
+                result["total_items"] += len(news_items)
+                result["filtered_items"] += len(filtered_news)
+    
+    elif mode == "incremental":
+        # 增量模式：只显示新增内容
+        if time:
+            crawl_time = time
+            # 获取上一个时间点
+            prev = db.execute("""
+                SELECT crawl_time FROM crawl_records 
+                WHERE DATE(crawl_time) = ? AND crawl_time < ?
+                ORDER BY crawl_time DESC LIMIT 1
+            """, (date, time))
+            prev_time = prev[0]['crawl_time'] if prev else None
+        else:
+            # 获取最新两个时间点
+            records = db.execute("""
+                SELECT crawl_time FROM crawl_records 
+                WHERE DATE(crawl_time) = ?
+                ORDER BY crawl_time DESC LIMIT 2
+            """, (date,))
+            if len(records) >= 1:
+                crawl_time = records[0]['crawl_time']
+                prev_time = records[1]['crawl_time'] if len(records) >= 2 else None
+            else:
+                return result
+        
+        result["time"] = crawl_time
+        result["prev_time"] = prev_time
+        
+        for platform in platforms:
+            platform_id = platform['id']
+            
+            if prev_time:
+                # 获取新增的内容（当前有但上次没有的）
+                news_items = db.execute("""
+                    SELECT DISTINCT n.*, rh.rank as current_rank
+                    FROM news_items n
+                    JOIN rank_history rh ON n.id = rh.news_item_id
+                    WHERE n.platform_id = ?
+                      AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
+                      AND n.id NOT IN (
+                          SELECT DISTINCT n2.id
+                          FROM news_items n2
+                          JOIN rank_history rh2 ON n2.id = rh2.news_item_id
+                          WHERE n2.platform_id = ?
+                            AND ABS(JULIANDAY(rh2.crawl_time) - JULIANDAY(?)) < 0.0035
+                      )
+                    ORDER BY rh.rank ASC
+                    LIMIT 50
+                """, (platform_id, crawl_time, platform_id, prev_time))
+            else:
+                # 如果没有上一次记录，显示所有当前数据
+                news_items = db.execute("""
+                    SELECT DISTINCT n.*, rh.rank as current_rank
+                    FROM news_items n
+                    JOIN rank_history rh ON n.id = rh.news_item_id
+                    WHERE n.platform_id = ?
+                      AND ABS(JULIANDAY(rh.crawl_time) - JULIANDAY(?)) < 0.0035
+                    ORDER BY rh.rank ASC
+                    LIMIT 50
+                """, (platform_id, crawl_time))
+            
+            filtered_news = []
+            for item in news_items:
+                if use_keywords and word_groups:
+                    if not matches_word_groups(item['title'], word_groups, filter_words, global_filters):
+                        continue
+                
+                filtered_news.append({
+                    "id": item['id'],
+                    "title": item['title'],
+                    "url": item['url'],
+                    "rank": item['current_rank'] or item['rank'],
+                    "is_new": True,
+                    "first_time": item['first_crawl_time']
+                })
+            
+            if filtered_news:
+                result["platforms"].append({
+                    "id": platform_id,
+                    "name": platform['name'],
+                    "items": filtered_news,
+                    "total": len(news_items),
+                    "filtered": len(filtered_news)
+                })
+                result["total_items"] += len(news_items)
+                result["filtered_items"] += len(filtered_news)
+    
+    return result
