@@ -1,116 +1,111 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- 筛选栏 -->
-<div class="bg-white rounded-lg shadow p-4 mb-6">
-    <form method="get" class="flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[200px]">
-            <label class="block text-sm text-gray-600 mb-1">搜索</label>
+<!-- 筛选栏 - 移动端可折叠 -->
+<div class="bg-white rounded-lg shadow mb-4">
+    <!-- 筛选栏头部 - 点击展开/收起 -->
+    <div class="flex items-center justify-between px-4 py-3 cursor-pointer md:cursor-default" onclick="toggleFilter()">
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-700">筛选</span>
+            {% if current_search or current_platform or current_date %}
+            <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded">已筛选</span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">{{ total }} 条</span>
+            <svg id="filter-arrow" class="w-4 h-4 text-gray-400 transition-transform md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+    </div>
+    <!-- 筛选表单 - 移动端默认收起 -->
+    <div id="filter-form" class="hidden md:block border-t border-gray-100">
+        <form method="get" class="p-4 space-y-3">
             <input type="text" name="search" value="{{ current_search or '' }}" 
                 placeholder="搜索新闻标题..." 
-                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
-        </div>
-        <div class="w-40">
-            <label class="block text-sm text-gray-600 mb-1">平台</label>
-            <select name="platform" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary">
-                <option value="">全部平台</option>
-                {% for p in platforms %}
-                <option value="{{ p.id }}" {% if current_platform == p.id %}selected{% endif %}>{{ p.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="w-40">
-            <label class="block text-sm text-gray-600 mb-1">日期</label>
-            <select name="date" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary">
-                <option value="">全部日期</option>
-                {% for d in available_dates %}
-                <option value="{{ d }}" {% if current_date == d %}selected{% endif %}>{{ d }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-600">
-            筛选
-        </button>
-        {% if current_search or current_platform or current_date %}
-        <a href="/news" class="px-4 py-2 text-gray-600 hover:text-primary">清除</a>
-        {% endif %}
-    </form>
+                class="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary focus:bg-white">
+            <div class="flex gap-2">
+                <select name="platform" class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                    <option value="">全部平台</option>
+                    {% for p in platforms %}
+                    <option value="{{ p.id }}" {% if current_platform == p.id %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="date" class="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary">
+                    <option value="">全部日期</option>
+                    {% for d in available_dates %}
+                    <option value="{{ d }}" {% if current_date == d %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 py-2.5 bg-primary text-white rounded-lg text-sm font-medium">
+                    筛选
+                </button>
+                {% if current_search or current_platform or current_date %}
+                <a href="/news" class="px-4 py-2.5 text-gray-500 bg-gray-100 rounded-lg text-sm">清除</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 </div>
 
-<!-- 结果统计 -->
-<div class="flex justify-between items-center mb-4">
-    <p class="text-sm text-gray-600">
-        共 <span class="font-medium">{{ total }}</span> 条新闻
-        {% if total_pages > 1 %}，第 {{ page }}/{{ total_pages }} 页{% endif %}
-    </p>
-</div>
-
-<!-- 新闻列表 -->
-<div class="bg-white rounded-lg shadow overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-gray-50 text-left">
-            <tr>
-                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-12">排名</th>
-                <th class="px-4 py-3 text-sm font-medium text-gray-600">标题</th>
-                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-24 hidden md:table-cell">平台</th>
-                <th class="px-4 py-3 text-sm font-medium text-gray-600 w-36 hidden lg:table-cell">时间</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y">
-            {% for news in news_list %}
-            <tr class="hover:bg-gray-50">
-                <td class="px-4 py-3">
-                    <span class="inline-flex items-center justify-center w-6 h-6 rounded text-xs
-                        {% if news.rank <= 3 %}bg-red-500 text-white{% elif news.rank <= 10 %}bg-orange-400 text-white{% else %}bg-gray-200 text-gray-600{% endif %}">
-                        {{ news.rank or '-' }}
-                    </span>
-                </td>
-                <td class="px-4 py-3">
-                    <a href="{{ news.url }}" target="_blank" class="text-gray-800 hover:text-primary">
-                        {{ news.title }}
-                    </a>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-500 hidden md:table-cell">
-                    {{ news.platform_name }}
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-400 hidden lg:table-cell">
-                    {{ news.first_crawl_time[:16] | replace('T', ' ') if news.first_crawl_time else '-' }}
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="4" class="px-4 py-12 text-center text-gray-500">
-                    暂无数据
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<!-- 新闻列表 - 卡片式布局 -->
+<div class="space-y-2">
+    {% for news in news_list %}
+    <a href="{{ news.url }}" target="_blank" class="block bg-white rounded-lg shadow-sm p-3 active:bg-gray-50 transition">
+        <!-- 标题 -->
+        <h3 class="text-sm text-gray-800 leading-relaxed line-clamp-2">{{ news.title }}</h3>
+        <!-- 元信息：时间、平台、排名 -->
+        <div class="flex items-center gap-2 mt-1.5 text-xs text-gray-400">
+            <span>{{ news.first_crawl_time[:16] | replace('T', ' ') if news.first_crawl_time else '-' }}</span>
+            <span class="text-primary font-medium">{{ news.platform_name }}</span>
+            {% if news.rank and news.rank <= 10 %}
+            <span class="text-orange-500">#{{ news.rank }}</span>
+            {% elif news.rank %}
+            <span>#{{ news.rank }}</span>
+            {% endif %}
+        </div>
+    </a>
+    {% else %}
+    <div class="bg-white rounded-lg shadow-sm p-12 text-center text-gray-500">
+        暂无数据
+    </div>
+    {% endfor %}
 </div>
 
 <!-- 分页 -->
 {% if total_pages > 1 %}
-<div class="flex justify-center mt-6 space-x-2">
+<div class="flex justify-center items-center gap-1 mt-4 py-2">
     {% if page > 1 %}
     <a href="?page={{ page - 1 }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
-       class="px-3 py-1 border rounded hover:bg-gray-50">上一页</a>
+       class="px-3 py-2 text-sm text-gray-600 bg-white rounded-lg shadow-sm">上一页</a>
     {% endif %}
     
-    {% for p in range(1, total_pages + 1) %}
-        {% if p == page %}
-        <span class="px-3 py-1 bg-primary text-white rounded">{{ p }}</span>
-        {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-        <a href="?page={{ p }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
-           class="px-3 py-1 border rounded hover:bg-gray-50">{{ p }}</a>
-        {% elif p == page - 3 or p == page + 3 %}
-        <span class="px-2">...</span>
-        {% endif %}
-    {% endfor %}
+    <span class="px-3 py-2 text-sm text-gray-500">{{ page }} / {{ total_pages }}</span>
     
     {% if page < total_pages %}
     <a href="?page={{ page + 1 }}{% if current_platform %}&platform={{ current_platform }}{% endif %}{% if current_date %}&date={{ current_date }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}" 
-       class="px-3 py-1 border rounded hover:bg-gray-50">下一页</a>
+       class="px-3 py-2 text-sm text-gray-600 bg-white rounded-lg shadow-sm">下一页</a>
     {% endif %}
 </div>
 {% endif %}
+
+<script>
+function toggleFilter() {
+    // 只在移动端生效
+    if (window.innerWidth >= 768) return;
+    
+    const form = document.getElementById('filter-form');
+    const arrow = document.getElementById('filter-arrow');
+    
+    if (form.classList.contains('hidden')) {
+        form.classList.remove('hidden');
+        arrow.style.transform = 'rotate(180deg)';
+    } else {
+        form.classList.add('hidden');
+        arrow.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
 {% endblock %}

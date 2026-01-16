@@ -2,20 +2,20 @@
 
 {% block content %}
 <style>
-    /* 视图切换 Tab */
+    /* 视图切换 Tab - 移动端优化 */
     .view-tabs {
         display: flex;
         background: white;
         border-radius: 10px;
-        padding: 4px;
-        gap: 4px;
+        padding: 3px;
+        gap: 3px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     .view-tab {
         flex: 1;
-        padding: 10px 12px;
+        padding: 8px 6px;
         border-radius: 8px;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
         text-align: center;
         color: #6b7280;
@@ -29,33 +29,39 @@
         color: white;
     }
     .view-tab .count {
-        font-size: 12px;
+        font-size: 11px;
         opacity: 0.8;
-        margin-left: 4px;
+        margin-left: 2px;
     }
     
-    /* 控制栏 */
+    /* 控制栏 - 移动端优化 */
     .control-bar {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
+        gap: 8px;
+        padding: 10px 12px;
         background: white;
         border-radius: 10px;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     .control-bar .left {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
     }
     .control-bar .stats {
-        font-size: 13px;
+        font-size: 12px;
         color: #6b7280;
     }
     .control-bar .stats strong {
         color: #1f2937;
+    }
+    .control-bar .buttons {
+        display: flex;
+        gap: 6px;
     }
     
     /* 开关 */
@@ -107,17 +113,18 @@
         transform: translateX(16px);
     }
     
-    /* 操作按钮 */
+    /* 操作按钮 - 移动端紧凑 */
     .action-btn {
-        padding: 6px 12px;
+        padding: 5px 10px;
         border-radius: 6px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 500;
         border: 1px solid #e5e7eb;
         background: white;
         color: #6b7280;
         cursor: pointer;
         transition: all 0.2s;
+        white-space: nowrap;
     }
     .action-btn:hover {
         background: #f3f4f6;
@@ -138,16 +145,16 @@
         background: #fef2f2;
     }
     
-    /* 关键字分组卡片 */
+    /* 关键字分组卡片 - 移动端优化 */
     .keyword-card {
         background: white;
-        border-radius: 12px;
-        margin-bottom: 16px;
+        border-radius: 10px;
+        margin-bottom: 12px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.08);
         overflow: hidden;
     }
     .keyword-header {
-        padding: 14px 16px;
+        padding: 10px 12px;
         border-bottom: 1px solid #f3f4f6;
         display: flex;
         align-items: center;
@@ -156,32 +163,30 @@
     .keyword-name {
         font-weight: 600;
         color: #1f2937;
-        font-size: 15px;
+        font-size: 14px;
     }
     .keyword-count {
-        font-size: 13px;
+        font-size: 12px;
         color: #6b7280;
         font-weight: 500;
     }
     .keyword-count.hot { color: #dc2626; }
     .keyword-count.warm { color: #ea580c; }
     .keyword-index {
-        font-size: 12px;
+        font-size: 11px;
         color: #9ca3af;
-        margin-left: 12px;
+        margin-left: 8px;
     }
     
-    /* 新闻列表 */
+    /* 新闻列表 - 移动端优化 */
     .news-list {
         padding: 0;
     }
     .news-item {
-        display: flex;
-        padding: 12px 16px;
-        border-bottom: 1px solid #f9fafb;
-        gap: 10px;
+        display: block;
+        padding: 10px 12px;
+        border-bottom: 1px solid #f3f4f6;
         transition: all 0.3s ease;
-        align-items: flex-start;
     }
     .news-item:last-child {
         border-bottom: none;
@@ -190,66 +195,64 @@
         opacity: 0;
         transform: translateX(-20px);
         max-height: 0;
-        padding: 0 16px;
+        padding: 0 12px;
         overflow: hidden;
     }
     .news-item.read {
         opacity: 0.5;
     }
     
-    /* 平台名称链接 */
-    .news-platform {
-        font-size: 12px;
-        color: #6b7280;
-        font-weight: 500;
-        cursor: pointer;
-        transition: color 0.2s;
+    /* 新闻标题 - 突出显示 */
+    .news-title {
+        font-size: 14px;
+        color: #1f2937;
+        line-height: 1.6;
+        margin-bottom: 6px;
     }
-    .news-platform:hover {
-        color: #3b82f6;
-        text-decoration: underline;
+    .news-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .news-title a:hover {
+        color: #2563eb;
     }
     
-    /* 排名标签 */
-    .news-rank {
-        flex-shrink: 0;
-        min-width: 28px;
-        height: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-        background: #6b7280;
-        color: white;
-        margin-top: 2px;
-    }
-    .news-rank.top1 { background: #dc2626; }
-    .news-rank.top2 { background: #ea580c; }
-    .news-rank.top3 { background: #f59e0b; }
-    .news-rank.top10 { background: #3b82f6; }
-    
-    /* 新闻内容区 */
-    .news-content {
-        flex: 1;
-        min-width: 0;
-    }
+    /* 新闻元信息 - 次要显示 */
     .news-meta {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 4px;
+        gap: 6px;
         flex-wrap: wrap;
     }
+    
+    /* 平台名称 */
+    .news-platform {
+        font-size: 11px;
+        color: #3b82f6;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .news-platform:hover {
+        text-decoration: underline;
+    }
+    
+    /* 排名 - 简化为文字 */
+    .news-rank {
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    .news-rank.hot {
+        color: #f97316;
+    }
+    
     .news-time {
         font-size: 11px;
         color: #9ca3af;
     }
     .news-badge {
         font-size: 10px;
-        font-weight: 600;
-        padding: 1px 5px;
+        font-weight: 500;
+        padding: 1px 4px;
         border-radius: 3px;
     }
     .news-badge.count {
@@ -261,40 +264,24 @@
         color: #9ca3af;
     }
     
-    .news-title {
-        font-size: 14px;
-        color: #374151;
-        line-height: 1.5;
-    }
-    .news-title a {
-        color: inherit;
-        text-decoration: none;
-    }
-    .news-title a:hover {
-        color: #2563eb;
-    }
-    
     /* 已读按钮 */
     .news-actions {
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
+        display: inline-flex;
+        margin-left: 6px;
     }
     .read-btn {
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 12px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
         font-weight: 500;
         border: 1px solid #e5e7eb;
         background: white;
-        color: #6b7280;
+        color: #9ca3af;
         cursor: pointer;
         transition: all 0.2s;
-        white-space: nowrap;
     }
     .read-btn:hover {
         background: #f3f4f6;
-        border-color: #d1d5db;
     }
     .read-btn.restore {
         color: #3b82f6;
@@ -346,9 +333,9 @@
     }
 </style>
 
-<div class="max-w-3xl mx-auto pb-4">
+<div class="max-w-3xl mx-auto pb-2">
     <!-- 视图切换 -->
-    <div class="view-tabs mb-4" id="view-tabs">
+    <div class="view-tabs mb-3" id="view-tabs">
         <button class="view-tab active" data-view="unread">
             未读 <span class="count" id="unread-count">(0)</span>
         </button>
@@ -544,22 +531,20 @@
             
             group.items.forEach((item, itemIndex) => {
                 const rank = item.rank || 0;
-                let rankClass = '';
-                if (rank === 1) rankClass = 'top1';
-                else if (rank === 2) rankClass = 'top2';
-                else if (rank === 3) rankClass = 'top3';
-                else if (rank <= 10) rankClass = 'top10';
+                const rankClass = rank <= 10 ? 'hot' : '';
                 
                 const readClass = item.is_read ? 'read' : '';
                 const timeDisplay = formatTime(item.publish_time || item.first_time);
                 
                 html += `
                     <div class="news-item ${readClass}" data-news-id="${item.id}">
-                        <span class="news-rank ${rankClass}">${rank || '-'}</span>
-                        <div class="news-content">
-                            <div class="news-meta">
-                                <span class="news-platform" onclick="gotoPlatform('${item.platform_id}')">${escapeHtml(item.platform_name)}</span>
-                                <span class="news-time">${timeDisplay}</span>
+                        <div class="news-title">
+                            <a href="${escapeHtml(item.url)}" target="_blank" onclick="markRead(${item.id}, this)">${escapeHtml(item.title)}</a>
+                        </div>
+                        <div class="news-meta">
+                            <span class="news-time">${timeDisplay}</span>
+                            <span class="news-platform" onclick="event.preventDefault();gotoPlatform('${item.platform_id}')">${escapeHtml(item.platform_name)}</span>
+                            ${rank ? `<span class="news-rank ${rankClass}">#${rank}</span>` : ''}
                 `;
                 
                 if (item.appear_count > 1) {
@@ -571,19 +556,11 @@
                     html += `<span class="news-badge read-time">${readTime}已读</span>`;
                 }
                 
-                html += `
-                            </div>
-                            <div class="news-title">
-                                <a href="${escapeHtml(item.url)}" target="_blank" onclick="markRead(${item.id}, this)">${escapeHtml(item.title)}</a>
-                            </div>
-                        </div>
-                        <div class="news-actions">
-                `;
-                
+                // 已读按钮
                 if (item.is_read) {
-                    html += `<button class="read-btn restore" onclick="unmarkRead(${item.id}, this)">恢复</button>`;
+                    html += `<span class="news-actions"><button class="read-btn restore" onclick="event.preventDefault();unmarkRead(${item.id}, this)">恢复</button></span>`;
                 } else {
-                    html += `<button class="read-btn" onclick="markRead(${item.id}, this)">已读</button>`;
+                    html += `<span class="news-actions"><button class="read-btn" onclick="event.preventDefault();markRead(${item.id}, this)">已读</button></span>`;
                 }
                 
                 html += `
