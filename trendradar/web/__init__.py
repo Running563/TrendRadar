@@ -11,7 +11,7 @@ def main():
     """Web 服务启动入口"""
     parser = argparse.ArgumentParser(description='TrendRadar Web 服务')
     parser.add_argument('--host', default='0.0.0.0', help='绑定地址 (默认: 0.0.0.0)')
-    parser.add_argument('--port', '-p', type=int, default=8080, help='端口号 (默认: 8080)')
+    parser.add_argument('--port', '-p', type=int, default=8088, help='端口号 (默认: 8088)')
     parser.add_argument('--reload', action='store_true', help='开发模式，自动重载')
     parser.add_argument('--db', default='data/trendradar.db', help='数据库路径')
     

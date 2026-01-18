@@ -43,6 +43,64 @@
 
 > 本项目以轻量，易部署为目标
 
+## 🚀 快速启动
+
+### 两种运行模式
+
+TrendRadar 提供两种运行模式以满足不同需求：
+
+#### 1️⃣ Web 服务模式（推荐）
+
+提供持续运行的 Web 界面，支持在线查看热点和管理配置。
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动 Web 服务（默认端口 8088）
+source venv/bin/activate
+python -m trendradar.web --port 8088
+
+# 后台运行
+nohup python -m trendradar.web --port 8088 >> logs/trendradar_web.log 2>&1 &
+```
+
+**访问地址：**
+- 本地访问：`http://localhost:8088`
+- 局域网访问：`http://<服务器IP>:8088`
+
+**日志查看：**
+```bash
+tail -f logs/trendradar_web.log
+```
+
+#### 2️⃣ 命令行模式
+
+执行一次数据抓取和分析后退出，适合定时任务。
+
+```bash
+# 单次执行
+python -m trendradar
+
+# 后台运行
+nohup python -m trendradar >> logs/trendradar.log 2>&1 &
+```
+
+### 服务管理
+
+```bash
+# 查看运行状态
+ps aux | grep "python -m trendradar"
+
+# 查看端口监听
+lsof -i :8088
+
+# 停止服务
+pkill -f "python -m trendradar.web"
+```
+
+---
+
 ## 📑 快速导航
 
 <div align="center">

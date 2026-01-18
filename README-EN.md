@@ -43,6 +43,64 @@
 
 > This project is designed to be lightweight and easy to deploy
 
+## 🚀 Quick Start Guide
+
+### Two Running Modes
+
+TrendRadar provides two modes to meet different needs:
+
+#### 1️⃣ Web Service Mode (Recommended)
+
+Provides a persistent web interface for viewing trends and managing configurations.
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Start web service (default port 8088)
+source venv/bin/activate
+python -m trendradar.web --port 8088
+
+# Run in background
+nohup python -m trendradar.web --port 8088 >> logs/trendradar_web.log 2>&1 &
+```
+
+**Access URLs:**
+- Local: `http://localhost:8088`
+- Network: `http://<server-ip>:8088`
+
+**View logs:**
+```bash
+tail -f logs/trendradar_web.log
+```
+
+#### 2️⃣ Command-Line Mode
+
+Executes data fetching and analysis once, suitable for scheduled tasks.
+
+```bash
+# Single execution
+python -m trendradar
+
+# Run in background
+nohup python -m trendradar >> logs/trendradar.log 2>&1 &
+```
+
+### Service Management
+
+```bash
+# Check running status
+ps aux | grep "python -m trendradar"
+
+# Check port listening
+lsof -i :8088
+
+# Stop service
+pkill -f "python -m trendradar.web"
+```
+
+---
+
 ## 📑 Quick Navigation
 
 <div align="center">
